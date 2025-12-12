@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv
+
+# Django
+*.log
+db.sqlite3
+db.sqlite3-journal
+/media
+/staticfiles
+
+# Vector stores
+chroma_rag/
+chroma_vanna/
+*.db
+*.sqlite
+
+# Environment
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Artifacts (keep local)
+.gemini/
+
+# Ollama models (too large)
+*.gguf
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
