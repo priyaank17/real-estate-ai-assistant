@@ -30,14 +30,33 @@ def setup_vanna():
     print("🚀 Starting Vanna Setup with OpenAI (GPT-4o-mini)...")
     
     # Initialize Vanna with OpenAI
-    vn = VannaOpenAI(config={
-        'model': 'gpt-4o-mini',  # Cheapest, fastest model
-        'path': 'chroma_vanna'
-    })
+    config = {
+        "model": os.getenv("AZURE_OPENAI_CHAT_DEPLOYMENT") or os.getenv("OPENAI_LLM_MODEL", "gpt-4o-mini"),
+        "path": "chroma_vanna",
+    }
+
+    azure_key = os.getenv("AZURE_OPENAI_API_KEY")
+    azure_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
+    if azure_key and azure_endpoint:
+        config.update(
+            {
+                "api_key": azure_key,
+                "api_base": azure_endpoint,
+                "api_type": "azure",
+                "api_version": os.getenv("AZURE_OPENAI_API_VERSION", "2024-05-01-preview"),
+                "deployment_id": os.getenv("AZURE_OPENAI_CHAT_DEPLOYMENT", "gpt-4o-mini"),
+            }
+        )
+    else:
+        api_key = os.getenv("OPENAI_API_KEY")
+        if api_key:
+            config["api_key"] = api_key
+
+    vn = VannaOpenAI(config=config)
 
     db_path = settings.DATABASES['default']['NAME']
     print(f"🔌 Connecting to SQLite DB at: {db_path}")
-    vn.connect_to_sqlite(db_path)
+    vn.connect_to_sqlite(str(db_path))
 
     # ========================================
     # 1. Train on DDL (Schema)

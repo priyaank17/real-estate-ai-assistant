@@ -2,7 +2,7 @@ import os
 import sys
 import django
 from django.test import TestCase, Client
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, AsyncMock
 from langchain_core.messages import AIMessage
 
 # Setup Django
@@ -21,12 +21,12 @@ class ApiTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("conversation_id", response.json())
 
-    @patch("agents.api.agent_app.invoke")
-    def test_chat_api(self, mock_invoke):
+    @patch("agents.api.agent_app.ainvoke", new_callable=AsyncMock)
+    def test_chat_api(self, mock_ainvoke):
         """Test the chat API with mocked agent response."""
         # Mock the agent returning a simple text response
         mock_msg = AIMessage(content="Hello there!")
-        mock_invoke.return_value = {"messages": [mock_msg]}
+        mock_ainvoke.return_value = {"messages": [mock_msg]}
         
         response = self.client.post(
             "/api/agents/chat", 
@@ -38,9 +38,12 @@ class ApiTests(TestCase):
         data = response.json()
         self.assertEqual(data["response"], "Hello there!")
         self.assertIsNone(data["data"])
+        self.assertIsNone(data["tools_used"])
+        self.assertIsNone(data["preview_markdown"])
+        self.assertIsNone(data.get("citations"))
 
-    @patch("agents.api.agent_app.invoke")
-    def test_chat_api_with_structured_data(self, mock_invoke):
+    @patch("agents.api.agent_app.ainvoke", new_callable=AsyncMock)
+    def test_chat_api_with_structured_data(self, mock_ainvoke):
         """Test the chat API when agent returns structured data via ui_tool."""
         # Mock the agent returning a tool call
         mock_msg = AIMessage(
@@ -51,7 +54,7 @@ class ApiTests(TestCase):
                 "id": "call_123"
             }]
         )
-        mock_invoke.return_value = {"messages": [mock_msg]}
+        mock_ainvoke.return_value = {"messages": [mock_msg]}
         
         response = self.client.post(
             "/api/agents/chat", 
@@ -63,3 +66,6 @@ class ApiTests(TestCase):
         data = response.json()
         self.assertEqual(data["response"], "I found some projects.")
         self.assertEqual(data["data"]["shortlisted_project_ids"], [101, 102])
+        self.assertEqual(data["tools_used"], ["update_ui_context"])
+        self.assertIsNone(data["preview_markdown"])
+        self.assertIsNone(data.get("citations"))

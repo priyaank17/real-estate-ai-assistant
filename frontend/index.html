@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Silver Land Concierge</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #111827;
+      --accent: #06b6d4;
+      --text: #e5e7eb;
+      --muted: #94a3b8;
+      --border: #1f2937;
+      --danger: #ef4444;
+      --success: #10b981;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Inter", system-ui, -apple-system, sans-serif;
+      background: linear-gradient(135deg, #0b1224, #0f172a 60%, #0b1224);
+      color: var(--text);
+    }
+    a { color: var(--accent); }
+    .app {
+      display: grid;
+      grid-template-columns: 280px 1fr 320px;
+      gap: 16px;
+      padding: 16px;
+      min-height: 100vh;
+    }
+    .panel {
+      background: rgba(17, 24, 39, 0.9);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.35);
+      backdrop-filter: blur(6px);
+      overflow: hidden;
+    }
+    .panel-header {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      font-weight: 600;
+      letter-spacing: 0.2px;
+    }
+    .history {
+      padding: 10px;
+      display: grid;
+      gap: 8px;
+      max-height: calc(100vh - 64px);
+      overflow-y: auto;
+    }
+    .history button {
+      text-align: left;
+      width: 100%;
+      background: #0b1020;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px;
+      cursor: pointer;
+      transition: border-color 0.15s, transform 0.15s;
+    }
+    .history button:hover { border-color: var(--accent); transform: translateY(-1px); }
+    .history button.active { border-color: var(--accent); background: #0f172a; }
+
+    .chat {
+      display: grid;
+      grid-template-rows: 1fr auto;
+      height: calc(100vh - 32px);
+    }
+    .messages {
+      padding: 16px;
+      overflow-y: auto;
+      display: grid;
+      gap: 12px;
+    }
+    .bubble {
+      max-width: 720px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: #0b1020;
+      line-height: 1.5;
+      white-space: pre-wrap;
+    }
+    .bubble.user { margin-left: auto; background: #0f172a; }
+    .meta-grid {
+      display: grid;
+      gap: 10px;
+      padding: 12px;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: #0f172a;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .tool-list { display: flex; flex-wrap: wrap; gap: 6px; }
+    .table-preview {
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px;
+      background: #0b1020;
+      font-family: "JetBrains Mono", "SFMono-Regular", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 13px;
+      color: var(--text);
+    }
+    form {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      padding: 12px 16px 16px;
+      border-top: 1px solid var(--border);
+      background: #0b1020;
+    }
+    textarea {
+      width: 100%;
+      padding: 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: #0f172a;
+      color: var(--text);
+      resize: vertical;
+      min-height: 60px;
+      font-family: inherit;
+    }
+    button.send {
+      background: var(--accent);
+      color: #0b1020;
+      border: none;
+      border-radius: 10px;
+      padding: 14px 16px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    button.send:hover { transform: translateY(-1px); box-shadow: 0 10px 25px rgba(6, 182, 212, 0.35); }
+    .right-panel {
+      display: grid;
+      grid-template-rows: auto auto auto 1fr;
+      gap: 10px;
+      height: calc(100vh - 32px);
+    }
+    .section {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+      font-weight: 600;
+      color: var(--muted);
+    }
+    .list {
+      padding: 12px;
+      display: grid;
+      gap: 8px;
+      overflow-y: auto;
+    }
+    .id-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 8px;
+      border-radius: 8px;
+      background: #0f172a;
+      border: 1px solid var(--border);
+      font-size: 12px;
+      color: var(--text);
+    }
+    .muted { color: var(--muted); }
+    .citation { font-size: 13px; color: var(--muted); line-height: 1.4; }
+    .citation strong { color: var(--text); }
+    @media (max-width: 1100px) {
+      .app { grid-template-columns: 1fr; }
+      .chat { height: auto; }
+      .right-panel { grid-template-rows: auto auto auto auto; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="panel">
+      <div class="panel-header">Conversation History</div>
+      <div class="history" id="history"></div>
+    </div>
+
+    <div class="panel chat">
+      <div class="messages" id="messages"></div>
+      <form id="chat-form">
+        <textarea id="input" placeholder="Ask about properties, budgets, or book a visit..." required></textarea>
+        <button class="send" type="submit">Send</button>
+      </form>
+    </div>
+
+    <div class="panel right-panel">
+      <div>
+        <div class="section">Tools Used</div>
+        <div class="list" id="tools-list"><span class="muted">No tools yet.</span></div>
+      </div>
+      <div>
+        <div class="section">Shortlist</div>
+        <div class="list" id="shortlist"></div>
+      </div>
+      <div>
+        <div class="section">Preview Table</div>
+        <div class="list" id="preview"></div>
+      </div>
+      <div>
+        <div class="section">Citations</div>
+        <div class="list" id="citations"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = window.localStorage.getItem("api_base") || "http://localhost:8000/api/agents/chat";
+    const historyEl = document.getElementById("history");
+    const messagesEl = document.getElementById("messages");
+    const toolsEl = document.getElementById("tools-list");
+    const shortlistEl = document.getElementById("shortlist");
+    const previewEl = document.getElementById("preview");
+    const citationsEl = document.getElementById("citations");
+    const form = document.getElementById("chat-form");
+    const input = document.getElementById("input");
+
+    let conversationId = window.localStorage.getItem("conversation_id") || crypto.randomUUID();
+    let history = JSON.parse(window.localStorage.getItem("history") || "[]");
+
+    function persist() {
+      window.localStorage.setItem("conversation_id", conversationId);
+      window.localStorage.setItem("history", JSON.stringify(history.slice(-30)));
+    }
+
+    function renderHistory() {
+      historyEl.innerHTML = "";
+      if (!history.length) {
+        const empty = document.createElement("div");
+        empty.style.color = "var(--muted)";
+        empty.style.padding = "6px";
+        empty.textContent = "No conversations yet.";
+        historyEl.appendChild(empty);
+        return;
+      }
+      history.forEach((item, idx) => {
+        const btn = document.createElement("button");
+        btn.textContent = item.title || `Session ${idx + 1}`;
+        btn.className = item.id === conversationId ? "active" : "";
+        btn.onclick = () => {
+          conversationId = item.id;
+          renderHistory();
+          renderMessages(item.messages);
+        };
+        historyEl.appendChild(btn);
+      });
+    }
+
+    function renderMessages(msgs = []) {
+      messagesEl.innerHTML = "";
+      msgs.forEach(m => {
+        const div = document.createElement("div");
+        div.className = "bubble " + (m.role === "user" ? "user" : "assistant");
+        div.textContent = m.content;
+        messagesEl.appendChild(div);
+      });
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    function renderTools(tools = []) {
+      toolsEl.innerHTML = "";
+      if (!tools || !tools.length) {
+        toolsEl.innerHTML = '<span style="color: var(--muted);">No tools yet.</span>';
+        return;
+      }
+      const wrap = document.createElement("div");
+      wrap.className = "tool-list";
+      tools.forEach(t => {
+        const pill = document.createElement("span");
+        pill.className = "pill";
+        pill.textContent = t;
+        wrap.appendChild(pill);
+      });
+      toolsEl.appendChild(wrap);
+    }
+
+    function renderShortlist(ids = []) {
+      shortlistEl.innerHTML = "";
+      if (!ids || !ids.length) {
+        shortlistEl.innerHTML = '<span class="muted">No shortlisted IDs yet.</span>';
+        return;
+      }
+      ids.forEach(id => {
+        const chip = document.createElement("span");
+        chip.className = "id-chip";
+        chip.textContent = id;
+        shortlistEl.appendChild(chip);
+      });
+    }
+
+    function renderPreview(markdown) {
+      previewEl.innerHTML = "";
+      if (!markdown) {
+        previewEl.innerHTML = '<span class="muted">No table preview.</span>';
+        return;
+      }
+      const pre = document.createElement("pre");
+      pre.className = "table-preview";
+      pre.textContent = markdown;
+      previewEl.appendChild(pre);
+    }
+
+    function renderCitations(list = []) {
+      citationsEl.innerHTML = "";
+      if (!list || !list.length) {
+        citationsEl.innerHTML = '<span class="muted">No citations.</span>';
+        return;
+      }
+      list.forEach(item => {
+        const div = document.createElement("div");
+        div.className = "citation";
+        const name = item.project_name || "Unknown Project";
+        const city = item.city ? ` • ${item.city}` : "";
+        div.innerHTML = `<strong>${name}</strong>${city}<br>${(item.snippet || "").slice(0, 220)}${(item.snippet || "").length > 220 ? "…" : ""}`;
+        citationsEl.appendChild(div);
+      });
+    }
+
+    async function sendMessage(text) {
+      const session = history.find(h => h.id === conversationId) || { id: conversationId, title: text.slice(0, 32) + "...", messages: [] };
+      if (!history.includes(session)) history.unshift(session);
+      session.messages.push({ role: "user", content: text });
+      renderMessages(session.messages);
+      persist();
+
+      try {
+        const res = await fetch(API_BASE, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: text, conversation_id: conversationId })
+        });
+        const data = await res.json();
+        const assistantMsg = data.response || "[no response]";
+        session.messages.push({ role: "assistant", content: assistantMsg });
+        renderMessages(session.messages);
+        renderTools(data.tools_used || []);
+        renderShortlist((data.data && data.data.shortlisted_project_ids) || []);
+        renderPreview(data.preview_markdown);
+        renderCitations(data.citations);
+        persist();
+      } catch (err) {
+        const session = history.find(h => h.id === conversationId);
+        session.messages.push({ role: "assistant", content: "Error: " + err.message });
+        renderMessages(session.messages);
+      }
+    }
+
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const text = input.value.trim();
+      if (!text) return;
+      input.value = "";
+      sendMessage(text);
+    });
+
+    renderHistory();
+    if (history.length) {
+      const current = history.find(h => h.id === conversationId) || history[0];
+      conversationId = current.id;
+      renderHistory();
+      renderMessages(current.messages);
+    }
+  </script>
+</body>
+</html>

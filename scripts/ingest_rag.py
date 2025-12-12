@@ -1,12 +1,8 @@
 import os
 import sys
+import time
 import dotenv
-
-# Load environment variables
-dotenv.load_dotenv()
 import django
-from langchain_chroma import Chroma
-from langchain_ollama import OllamaEmbeddings
 from langchain_core.documents import Document
 
 # 1. Setup Django
@@ -18,7 +14,14 @@ from agents.models import Project
 from helpers.vectorstore import get_vectorstore
 
 def ingest_data():
-    print("🚀 Starting RAG Ingestion (Ollama)...")
+    dotenv.load_dotenv()
+    print("🚀 Starting RAG ingestion with Azure/OpenAI embeddings...")
+    
+    has_azure = bool(os.getenv("AZURE_OPENAI_API_KEY") and os.getenv("AZURE_OPENAI_ENDPOINT"))
+    has_openai = bool(os.getenv("OPENAI_API_KEY"))
+    if not (has_azure or has_openai):
+        print("⚠️  No Azure or OpenAI credentials found. Set AZURE_OPENAI_API_KEY/AZURE_OPENAI_ENDPOINT or OPENAI_API_KEY.")
+        return
     
     # 2. Fetch Projects
     projects = Project.objects.all()
@@ -34,15 +37,22 @@ def ingest_data():
         # We combine key fields to make the semantic search effective
         content = f"""
         Project Name: {project.name}
-        Description: {project.description}
+        City: {project.city}
+        Country: {project.country}
+        Property Type: {project.property_type}
+        Bedrooms: {project.bedrooms}
+        Bathrooms: {project.bathrooms}
+        Price: {project.price}
+        Area: {project.area}
+        Completion Status: {project.status or project.completion_date}
         Features: {project.features}
         Facilities: {project.facilities}
-        City: {project.city}
-        Property Type: {project.property_type}
+        Description: {project.description}
         """
         
         # Clean up whitespace
         content = "\n".join([line.strip() for line in content.split("\n") if line.strip()])
+        project_id = str(project.id)
         
         # Create Document with metadata
         doc = Document(
@@ -50,31 +60,48 @@ def ingest_data():
             metadata={
                 "project_name": project.name,
                 "city": project.city,
-                "id": project.id
+                "property_type": project.property_type,
+                "project_id": project_id,
+                "id": project_id,  # backward-compatible key
             }
         )
         documents.append(doc)
     
     # 4. Add to ChromaDB
-    print(f"🧠 Indexing {len(documents)} documents into ChromaDB...")
+    print(f"🧠 Indexing {len(documents)} documents into ChromaDB (Azure/OpenAI embeddings)...")
     vectorstore = get_vectorstore()
     
-    # Use smaller batches to avoid Ollama timeout/connection issues
-    batch_size = 10  # Reduced from 100 to prevent Ollama EOF errors
+    # Use small batches with retry/backoff to avoid connection drops
+    # Default batch size tuned for Azure/OpenAI; override via INGEST_BATCH_SIZE env var if needed
+    batch_size = int(os.getenv("INGEST_BATCH_SIZE", 50))
+    max_retries = 3
+    backoff_seconds = 2
+
     for i in range(0, len(documents), batch_size):
         batch = documents[i:i+batch_size]
-        try:
-            vectorstore.add_documents(batch)
-            print(f"   ✓ Indexed batch {i//batch_size + 1}/{(len(documents)-1)//batch_size + 1} ({len(batch)} docs)")
-        except Exception as e:
-            print(f"   ⚠️  Error on batch {i//batch_size + 1}: {str(e)}")
-            print(f"   Retrying with smaller batch...")
-            # Retry with even smaller batch
+        batch_no = i // batch_size + 1
+        attempt = 0
+        success = False
+        while attempt < max_retries and not success:
+            try:
+                vectorstore.add_documents(batch)
+                success = True
+                print(f"   ✓ Indexed batch {batch_no}/{(len(documents)-1)//batch_size + 1} ({len(batch)} docs)")
+            except Exception as e:
+                attempt += 1
+                print(f"   ⚠️  Error on batch {batch_no} (attempt {attempt}/{max_retries}): {str(e)}")
+                if attempt < max_retries:
+                    sleep_for = backoff_seconds * attempt
+                    print(f"   ↻ Retrying batch {batch_no} after {sleep_for}s ...")
+                    time.sleep(sleep_for)
+        if not success:
+            print(f"   ❌ Could not index batch {batch_no}, trying docs individually...")
             for doc in batch:
                 try:
                     vectorstore.add_documents([doc])
+                    print(f"      ✓ Indexed {doc.metadata.get('project_name', 'Unknown')}")
                 except Exception as retry_e:
-                    print(f"   ❌ Failed to index: {doc.metadata.get('project_name', 'Unknown')}")
+                    print(f"      ❌ Failed to index: {doc.metadata.get('project_name', 'Unknown')} ({retry_e})")
         
     print("✅ Ingestion Complete!")
 

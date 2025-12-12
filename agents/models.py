@@ -41,3 +41,21 @@ class Booking(models.Model):
     
     def __str__(self):
         return f"Booking for {self.lead} at {self.project}"
+
+
+class VisitBooking(models.Model):
+    """
+    Stores confirmed property visit bookings.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    lead = models.ForeignKey(Lead, on_delete=models.CASCADE, related_name="visit_bookings")
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="visit_bookings")
+    city = models.CharField(max_length=100, blank=True, null=True)
+    preferred_date = models.DateField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "visit_bookings"
+
+    def __str__(self):
+        return f"Visit booking for {self.lead} at {self.project}"

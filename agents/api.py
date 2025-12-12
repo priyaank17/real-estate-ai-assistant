@@ -1,4 +1,5 @@
 from ninja import NinjaAPI, Schema
+import json
 from typing import List, Optional, Dict, Any
 import uuid
 from langchain_core.messages import HumanMessage
@@ -26,9 +27,9 @@ local_tools = [
     book_viewing
 ]
 
-# Create agent app with local tools and memory
+# Create agent app with local tools and memory (custom graph by default)
 agent_app = create_agent_graph(local_tools)
-print("✅ API initialized with ReAct agent + memory")
+print("✅ API initialized with custom agent graph + memory")
 
 class ChatRequest(Schema):
     message: str
@@ -38,6 +39,9 @@ class ChatResponse(Schema):
     response: str
     conversation_id: str
     data: Optional[Dict[str, Any]] = None
+    tools_used: Optional[List[str]] = None
+    preview_markdown: Optional[str] = None
+    citations: Optional[List[Dict[str, Any]]] = None
 
 @api.post("/conversations")
 def create_conversation(request):
@@ -71,17 +75,58 @@ async def chat(request, payload: ChatRequest):
     
     # Extract structured data from tool calls
     structured_data = {}
-    for msg in reversed(result["messages"]):
-        if msg.type == "ai" and hasattr(msg, 'tool_calls') and msg.tool_calls:
+    tools_used = []
+    preview_markdown = None
+    citations = None
+
+    # Gather tools (preserve order of appearance)
+    for msg in result["messages"]:
+        if hasattr(msg, "tool_calls") and msg.tool_calls:
             for tool_call in msg.tool_calls:
-                if tool_call["name"] == "update_ui_context":
-                    structured_data = tool_call["args"]
+                tool_name = tool_call.get("name")
+                if tool_name:
+                    tools_used.append(tool_name)
+    # Capture latest tool outputs for previews/citations (reverse walk)
+    for msg in reversed(result["messages"]):
+        if getattr(msg, "type", None) == "tool":
+            parsed = None
+            if isinstance(msg.content, dict):
+                parsed = msg.content
+            elif isinstance(msg.content, str):
+                try:
+                    parsed = json.loads(msg.content)
+                except Exception:
+                    parsed = None
+            if isinstance(parsed, dict):
+                if parsed.get("preview_markdown") and not preview_markdown:
+                    preview_markdown = parsed.get("preview_markdown")
+                if parsed.get("results") and not citations:
+                    citations = parsed.get("results")
+            if preview_markdown and citations:
+                break
+    # Extract structured data from the latest update_ui_context call
+    for msg in reversed(result["messages"]):
+        if hasattr(msg, "tool_calls") and msg.tool_calls:
+            for tool_call in msg.tool_calls:
+                if tool_call.get("name") == "update_ui_context":
+                    structured_data = tool_call.get("args", {})
                     break
             if structured_data:
                 break
     
+    # Deduplicate tools while preserving order
+    seen = set()
+    tools_used_deduped = []
+    for t in tools_used:
+        if t not in seen:
+            tools_used_deduped.append(t)
+            seen.add(t)
+    
     return {
         "response": last_msg.content,
         "conversation_id": conversation_id,
-        "data": structured_data if structured_data else None
+        "data": structured_data if structured_data else None,
+        "tools_used": tools_used_deduped if tools_used_deduped else None,
+        "preview_markdown": preview_markdown,
+        "citations": citations if citations else None,
     }
