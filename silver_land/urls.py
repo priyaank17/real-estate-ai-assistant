@@ -16,9 +16,9 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
-from agents.api import api
+from agents.api_vanna import api_vanna  # Vanna 2.0 API
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/', api.urls),
+    path("api/", api_vanna.urls),  # Vanna 2.0 endpoints
 ]
