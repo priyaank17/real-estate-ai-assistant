@@ -1,41 +1,32 @@
 """
-Vanna 2.0 Agent Setup - Enhanced for Challenge Requirements
+Vanna 2.0 Agent Setup - Using Official API
 
-This module creates a Vanna 2.0 agent with:
-- OpenAI LLM (gpt-4o-mini)
-- Built-in SQL tool with Tool Memory (auto-learning)
-- Conversational memory (remembers context across turns)
-- Context Enricher for semantic search over property descriptions
-- Comprehensive monitoring and logging
-- Proactive booking strategy
-- Cross-selling (suggests alternatives when no exact match)
-- Custom business logic tools (Investment, Comparison, Booking)
+Following official Vanna docs: https://vanna.ai/docs/configure/openai/sqlite
 """
 import os
 import logging
 
-# Vanna 2.0 core imports (actual API)
-from vanna import (
-    Agent,
-    ToolRegistry,
-    User,
-    MemoryConversationStore
+# Official Vanna imports (from docs)
+from vanna import Agent
+from vanna.core.registry import ToolRegistry
+from vanna.core.user import UserResolver, User, RequestContext
+from vanna.tools import RunSqlTool
+from vanna.tools.agent_memory import (
+    SaveQuestionToolArgsTool,
+    SearchSavedCorrectToolUsesTool,
+    SaveTextMemoryTool
 )
-from vanna.core.user.resolver import UserResolver
-from vanna.core.user.context import RequestContext
-from vanna.capabilities.agent_memory.local import LocalAgentMemory
 from vanna.integrations.openai import OpenAILlmService
-from vanna.tools.sql import RunSqlTool
 from vanna.integrations.sqlite import SqliteRunner
+from vanna.integrations.local.agent_memory import DemoAgentMemory
 
 from django.conf import settings
 
-# Import our custom components
+# Import our custom tools
 from tools_vanna.investment_tool_vanna import InvestmentToolVanna
 from tools_vanna.comparison_tool_vanna import ComparisonToolVanna
 from tools_vanna.booking_tool_vanna import BookingToolVanna
 from tools_vanna.similarity_tool_vanna import FindSimilarPropertiesTool
-# from enrichers.description_enricher import PropertyDescriptionEnricher  # TODO: Fix enricher
 from monitoring.vanna_monitor import get_monitor
 
 # Setup logging
@@ -68,9 +59,7 @@ class SimpleUserResolver(UserResolver):
 def create_vanna_agent():
     """
     Factory function to create Vanna 2.0 agent.
-    
-    Note: Using simplified version due to actual Vanna 2.0 API differences.
-    Some advanced features (enrichers, detailed memory) may need adjustment.
+    Based on official docs: https://vanna.ai/docs/configure/openai/sqlite
     
     Returns:
         Agent: Configured Vanna agent
@@ -81,46 +70,62 @@ def create_vanna_agent():
     monitor = get_monitor(log_file="logs/vanna_monitor.log")
     logger.info("✅ Monitoring initialized")
     
-    # 1. Setup LLM (OpenAI GPT-4o-mini)
+    # 1. Configure LLM (following official docs)
     llm = OpenAILlmService(
-        api_key=os.getenv("OPENAI_API_KEY"),
-        model="gpt-4o-mini"
+        model="gpt-4o-mini",
+        api_key=os.getenv("OPENAI_API_KEY")
     )
     logger.info("✅ LLM configured: gpt-4o-mini")
     
-    # 2. Setup Agent Memory
-    agent_memory = LocalAgentMemory(max_items=1000)
-    logger.info("✅ Agent Memory initialized")
-    
-    # 3. Setup Conversation Store
-    conversation_store = MemoryConversationStore()
-    logger.info("✅ Conversation Store initialized")
-    
-    # 4. Setup Tools
-    tools = ToolRegistry()
-    
-    # Built-in SQL tool
+    # 2. Configure database tool (following official docs)
     db_path = settings.DATABASES['default']['NAME']
-    sql_tool = RunSqlTool(
+    db_tool = RunSqlTool(
         sql_runner=SqliteRunner(database_path=db_path)
     )
-    tools.register_local_tool(sql_tool, access_groups=['user', 'admin'])
-    logger.info("✅ SQL Tool registered")
+    logger.info(f"✅ Database configured: {db_path}")
     
-    # Custom business tools
+    # 3. Configure agent memory (following official docs)
+    agent_memory = DemoAgentMemory(max_items=1000)
+    logger.info("✅ Agent Memory initialized")
+    
+    # 4. Configure user authentication (following official docs)
+    user_resolver = SimpleUserResolver()
+    logger.info("✅ User Resolver configured")
+    
+    # 5. Create tool registry and register tools (following official docs)
+    tools = ToolRegistry()
+    
+    # Register database tool
+    tools.register_local_tool(db_tool, access_groups=['admin', 'user'])
+    
+    # Register agent memory tools (following official docs)
+    tools.register_local_tool(
+        SaveQuestionToolArgsTool(),
+        access_groups=['admin']
+    )
+    tools.register_local_tool(
+        SearchSavedCorrectToolUsesTool(),
+        access_groups=['admin', 'user']
+    )
+    tools.register_local_tool(
+        SaveTextMemoryTool(),
+        access_groups=['admin', 'user']
+    )
+    
+    # Register our custom business tools
     tools.register_local_tool(InvestmentToolVanna(), access_groups=['user', 'admin'])
     tools.register_local_tool(ComparisonToolVanna(), access_groups=['user', 'admin'])
     tools.register_local_tool(BookingToolVanna(), access_groups=['user', 'admin'])
     tools.register_local_tool(FindSimilarPropertiesTool(), access_groups=['user', 'admin'])
-    logger.info("✅ Custom Business Tools registered (4 tools)")
     
-    # 5. Create Agent (simplified for actual API)
+    logger.info("✅ All tools registered (8 total)")
+    
+    # 6. Create agent (following official docs)
     agent = Agent(
         llm_service=llm,
         tool_registry=tools,
-        user_resolver=SimpleUserResolver(),
-        agent_memory=agent_memory,
-        conversation_store=conversation_store
+        user_resolver=user_resolver,
+        agent_memory=agent_memory
     )
     
     logger.info("=" * 60)
