@@ -9,16 +9,16 @@ from typing import Optional, Dict, Any
 import uuid
 from vanna_agent import create_vanna_agent
 
-# Create API with CORS enabled
+# Create API
 api_vanna = NinjaAPI(
     title="Silver Land Properties - Vanna 2.0 API",
-    version="2.0",
-    csrf=False  # Disable CSRF for API requests
+    version="2.0"
 )
 
 # Initialize Vanna agent
 vanna_agent = create_vanna_agent()
 print("✅ Vanna 2.0 Agent initialized for API")
+
 
 
 class ChatRequest(Schema):
