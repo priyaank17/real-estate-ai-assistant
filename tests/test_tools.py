@@ -22,7 +22,7 @@ class ToolTests(TestCase):
         result = update_ui_context.invoke({"shortlisted_project_ids": [1, 2, 3]})
         self.assertEqual(result, "UI Context Updated.")
 
-    @patch("agents.tools.sql_tool.get_vanna_client")
+    @patch("tools.sql_tool.get_vanna_client")
     def test_sql_tool(self, mock_get_vanna):
         """Test SQL tool with mocked Vanna client."""
         mock_vn = MagicMock()
@@ -33,7 +33,7 @@ class ToolTests(TestCase):
         result = execute_sql_query.invoke("Find projects")
         self.assertIn("| Project | Price |", result)
 
-    @patch("agents.tools.rag_tool.get_vectorstore")
+    @patch("tools.rag_tool.get_vectorstore")
     def test_rag_tool(self, mock_get_vectorstore):
         """Test RAG tool with mocked VectorStore."""
         mock_store = MagicMock()

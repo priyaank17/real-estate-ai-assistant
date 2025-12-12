@@ -298,7 +298,7 @@
     </div>
 
     <script>
-        const API_URL = 'http://localhost:8000/api/vanna/chat';
+        const API_URL = localStorage.getItem('vanna_api') || 'http://localhost:8000/api/vanna/chat';
         let conversationId = generateUUID();
 
         function generateUUID() {

@@ -1,9 +1,10 @@
+import os
 from typing import TypedDict, Annotated, List
 from langgraph.graph import StateGraph, END
 from langgraph.prebuilt import ToolNode, create_react_agent
 from langgraph.checkpoint.memory import MemorySaver
 from langchain_core.messages import BaseMessage, SystemMessage, HumanMessage
-from langchain_openai import ChatOpenAI
+from langchain_openai import AzureChatOpenAI, ChatOpenAI
 import operator
 
 # Define State
@@ -36,6 +37,24 @@ Tools:
 
 NEVER ask questions before calling tools. ALWAYS call tools first."""
 
+def _get_chat_model():
+    """
+    Prefer Azure OpenAI if configured; fallback to OpenAI.
+    """
+    azure_key = os.getenv("AZURE_OPENAI_API_KEY")
+    azure_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
+    azure_deployment = os.getenv("AZURE_OPENAI_CHAT_DEPLOYMENT", "gpt-4o-mini")
+    if azure_key and azure_endpoint:
+        return AzureChatOpenAI(
+            azure_endpoint=azure_endpoint,
+            api_key=azure_key,
+            api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-05-01-preview"),
+            azure_deployment=azure_deployment,
+            temperature=0,
+        )
+
+    return ChatOpenAI(model=os.getenv("OPENAI_LLM_MODEL", "gpt-4o-mini"), temperature=0)
+
 def create_custom_agent_graph(tools: List):
     """
     Custom StateGraph implementation (manual control).
@@ -45,7 +64,7 @@ def create_custom_agent_graph(tools: List):
     - Specific node behavior
     - Fine-grained control
     """
-    model = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+    model = _get_chat_model()
     model_with_tools = model.bind_tools(tools)
     
     def supervisor_node(state: AgentState):
@@ -80,7 +99,7 @@ def create_react_agent_graph(tools: List):
     - Better reasoning loop
     - Standard agent pattern
     """
-    model = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+    model = _get_chat_model()
     memory = MemorySaver()
     
     # Create ReAct agent with state_modifier (not system_message)

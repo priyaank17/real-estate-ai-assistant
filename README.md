@@ -273,20 +273,25 @@ curl -X POST http://localhost:8000/api/vanna/chat \
 ### Environment Variables
 
 ```bash
-# Required
-OPENAI_API_KEY=sk-your-key-here
+# Preferred: Azure OpenAI
+AZURE_OPENAI_API_KEY=<your-azure-openai-key>
+AZURE_OPENAI_ENDPOINT=https://<your-resource>.openai.azure.com/
+AZURE_OPENAI_API_VERSION=2024-05-01-preview
+AZURE_OPENAI_CHAT_DEPLOYMENT=gpt-4o-mini          # your chat deployment name
+AZURE_OPENAI_EMBED_DEPLOYMENT=text-embedding-3-small  # your embedding deployment name
 
-# Optional (Vanna 2.0)
-OPENAI_LLM_MODEL=gpt-4o-mini
-OPENAI_EMBEDDING_MODEL=text-embedding-3-small
+# Fallback (if Azure not set)
+# OPENAI_API_KEY=sk-your-key-here
+# OPENAI_LLM_MODEL=gpt-4o-mini
+# OPENAI_EMBEDDING_MODEL=text-embedding-3-small
 ```
 
 ### Models Used
 
 | Component | main | vanna2.0 |
 |-----------|------|----------|
-| **LLM** | OpenAI gpt-4o-mini | OpenAI gpt-4o-mini |
-| **Embeddings** | OpenAI text-embedding-3-small | OpenAI text-embedding-3-small |
+| **LLM** | Azure OpenAI `gpt-4o-mini` deployment (fallback: OpenAI) | Azure OpenAI `gpt-4o-mini` deployment (fallback: OpenAI) |
+| **Embeddings** | Azure OpenAI `text-embedding-3-small` deployment (fallback: OpenAI) | Azure OpenAI `text-embedding-3-small` deployment (fallback: OpenAI) |
 | **Vector DB** | ChromaDB | ChromaDB |
 | **Database** | SQLite | SQLite |
 

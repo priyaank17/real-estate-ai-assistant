@@ -30,7 +30,7 @@ SECRET_KEY = "django-insecure-aa4l-j^yeb=%lu*(mn@z!d09#cpva09((jigass&u!k523iqmy
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["*"]
 
 
 # Application definition
@@ -49,6 +49,7 @@ MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
+    "silver_land.simple_cors.CORSMiddleware",
     # Disable CSRF for API endpoints
     # "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",

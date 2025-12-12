@@ -1,0 +1,16 @@
+name
+django_migrations
+sqlite_sequence
+auth_group_permissions
+auth_user_groups
+auth_user_user_permissions
+django_admin_log
+agents_lead
+agents_booking
+django_content_type
+auth_permission
+auth_group
+auth_user
+django_session
+agents_project
+visit_bookings

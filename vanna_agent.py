@@ -5,17 +5,23 @@ Following official Vanna docs: https://vanna.ai/docs/configure/openai/sqlite
 """
 import os
 import logging
+import asyncio
 
 # Official Vanna imports (from docs)
 from vanna import Agent
 from vanna.core.registry import ToolRegistry
 from vanna.core.user import UserResolver, User, RequestContext
+from vanna.core.tool import ToolContext
 from vanna.tools import RunSqlTool
 from vanna.tools.agent_memory import (
     SaveQuestionToolArgsTool,
     SearchSavedCorrectToolUsesTool,
     SaveTextMemoryTool
 )
+try:
+    from vanna.integrations.azure import AzureOpenAILlmService
+except ImportError:
+    AzureOpenAILlmService = None
 from vanna.integrations.openai import OpenAILlmService
 from vanna.integrations.sqlite import SqliteRunner
 from vanna.integrations.local.agent_memory import DemoAgentMemory
@@ -71,22 +77,51 @@ def create_vanna_agent():
     logger.info("✅ Monitoring initialized")
     
     # 1. Configure LLM (following official docs)
-    llm = OpenAILlmService(
-        model="gpt-4o-mini",
-        api_key=os.getenv("OPENAI_API_KEY")
-    )
-    logger.info("✅ LLM configured: gpt-4o-mini")
+    # Prefer Azure OpenAI if configured, else fallback to OpenAI
+    azure_key = os.getenv("AZURE_OPENAI_API_KEY")
+    azure_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
+    azure_deployment = os.getenv("AZURE_OPENAI_CHAT_DEPLOYMENT", "gpt-4o-mini")
+    azure_version = os.getenv("AZURE_OPENAI_API_VERSION", "2024-05-01-preview")
+    openai_key = os.getenv("OPENAI_API_KEY")
+
+    if azure_key and azure_endpoint and AzureOpenAILlmService is not None:
+        llm = AzureOpenAILlmService(
+            deployment_name=azure_deployment,
+            api_key=azure_key,
+            azure_endpoint=azure_endpoint,
+            api_version=azure_version,
+        )
+        logger.info(f"✅ LLM configured (Azure): {azure_deployment}")
+    elif azure_key and azure_endpoint:
+        # Fallback to OpenAI client with Azure base_url + api-version
+        base_url = f"{azure_endpoint}/openai/deployments/{azure_deployment}"
+        if not base_url.endswith("/"):
+            base_url += "/"
+        llm = OpenAILlmService(
+            model=azure_deployment,
+            api_key=azure_key,
+            base_url=base_url,
+            default_headers={"api-key": azure_key},
+            default_query={"api-version": azure_version},
+        )
+        logger.info(f"✅ LLM configured (Azure via OpenAI client): {azure_deployment}")
+    else:
+        llm = OpenAILlmService(
+            model=os.getenv("OPENAI_LLM_MODEL", "gpt-4o-mini"),
+            api_key=openai_key,
+        )
+        logger.info(f"✅ LLM configured (OpenAI): {os.getenv('OPENAI_LLM_MODEL', 'gpt-4o-mini')}")
     
     # 2. Configure database tool (following official docs)
-    db_path = settings.DATABASES['default']['NAME']
+    db_path = str(settings.DATABASES['default']['NAME'])
     db_tool = RunSqlTool(
         sql_runner=SqliteRunner(database_path=db_path)
     )
     logger.info(f"✅ Database configured: {db_path}")
     
-    # 3. Configure agent memory (following official docs)
-    agent_memory = DemoAgentMemory(max_items=1000)
-    logger.info("✅ Agent Memory initialized")
+    # 3. Configure agent memory (in-memory for reliable seeding)
+    agent_memory = DemoAgentMemory(max_items=2000)
+    logger.info("✅ Agent Memory initialized (DemoAgentMemory)")
     
     # 4. Configure user authentication (following official docs)
     user_resolver = SimpleUserResolver()
@@ -112,13 +147,13 @@ def create_vanna_agent():
         access_groups=['admin', 'user']
     )
     
-    # Register our custom business tools
+    # Business and helper tools
     tools.register_local_tool(InvestmentToolVanna(), access_groups=['user', 'admin'])
     tools.register_local_tool(ComparisonToolVanna(), access_groups=['user', 'admin'])
     tools.register_local_tool(BookingToolVanna(), access_groups=['user', 'admin'])
-    tools.register_local_tool(FindSimilarPropertiesTool(), access_groups=['user', 'admin'])
-    
-    logger.info("✅ All tools registered (8 total)")
+    # tools.register_local_tool(FindSimilarPropertiesTool(), access_groups=['user', 'admin'])
+
+    logger.info("✅ All tools registered (12 total)")
     
     # 6. Create agent (following official docs)
     agent = Agent(
@@ -127,7 +162,87 @@ def create_vanna_agent():
         user_resolver=user_resolver,
         agent_memory=agent_memory
     )
-    
+
+    # Seed schema/context to help the LLM generate correct SQL
+    try:
+        seed_user = User(id="schema-seed", email="schema@example.com", group_memberships=["admin"])
+        seed_ctx = ToolContext(
+            user=seed_user,
+            conversation_id="schema-seed",
+            request_id="seed-1",
+            agent_memory=agent_memory,
+        )
+
+        async def _seed_schema():
+            await agent.agent_memory.save_text_memory(
+                content="""
+                Table agents_project:
+                - id (UUID primary key)
+                - name (text)
+                - bedrooms (int)
+                - bathrooms (float)
+                - status (text)
+                - unit_type (text)
+                - developer (text)
+                - price (numeric)
+                - area (float)
+                - property_type (text)
+                - city (text)
+                - country (text)
+                - completion_date (text)
+                - features (text)
+                - facilities (text)
+                - description (text)
+                """,
+                context=seed_ctx,
+            )
+            await agent.agent_memory.save_text_memory(
+                content="""
+                Table agents_lead:
+                - id (UUID primary key)
+                - first_name (text)
+                - last_name (text, nullable)
+                - email (text, unique)
+                - preferences (text, nullable)
+                - created_at (datetime)
+                """,
+                context=seed_ctx,
+            )
+            await agent.agent_memory.save_text_memory(
+                content="""
+                Table agents_booking:
+                - id (UUID primary key)
+                - lead_id (UUID, FK to agents_lead.id)
+                - project_id (UUID, FK to agents_project.id)
+                - booking_date (datetime)
+                """,
+                context=seed_ctx,
+            )
+            await agent.agent_memory.save_text_memory(
+                content="Example: 'Find 2 bedroom apartments in Dubai' -> SELECT * FROM agents_project WHERE bedrooms=2 AND property_type='apartment' AND city='Dubai' LIMIT 20",
+                context=seed_ctx,
+            )
+            await agent.agent_memory.save_text_memory(
+                content="Example: '2 bedroom flats in Miami under 4 million' -> SELECT name, city, bedrooms, price FROM agents_project WHERE city='Miami' AND price <= 4000000 AND property_type IN ('apartment','flat') ORDER BY price ASC LIMIT 20",
+                context=seed_ctx,
+            )
+            await agent.agent_memory.save_text_memory(
+                content="Example: 'Show recent bookings' -> SELECT b.id, p.name as project_name, l.first_name, l.email, b.booking_date FROM agents_booking b JOIN agents_project p ON b.project_id = p.id JOIN agents_lead l ON b.lead_id = l.id ORDER BY b.booking_date DESC LIMIT 20",
+                context=seed_ctx,
+            )
+            await agent.agent_memory.save_text_memory(
+                content=(
+                    "Tool usage guidance: For structured filters (city, price, bedrooms, property_type), "
+                    "first call run_sql with a SELECT on agents_project. Only use find_similar_properties "
+                    "if run_sql returns 0 rows. 'flat' is equivalent to 'apartment'."
+                ),
+                context=seed_ctx,
+            )
+
+        asyncio.run(_seed_schema())
+        logger.info("✅ Seeded schema/examples into agent memory")
+    except Exception as e:
+        logger.warning(f"⚠️  Could not seed schema/examples: {e}")
     logger.info("=" * 60)
     logger.info("✅ VANNA 2.0 AGENT INITIALIZED SUCCESSFULLY")
     logger.info("=" * 60)

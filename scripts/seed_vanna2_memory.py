@@ -18,7 +18,7 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'silver_land.settings')
 django.setup()
 
 from vanna_agent import create_vanna_agent
-from vanna.core.user import User
+from vanna.core.user import User, RequestContext
 
 
 async def seed_tool_memory():
@@ -61,25 +61,22 @@ async def seed_tool_memory():
         print(f"[{i}/{len(seed_queries)}] Processing: \"{query}\"")
         
         try:
-            # Execute query - this will automatically save to Tool Memory
-            result = await agent.execute(
-                messages=[{"role": "user", "content": query}],
-                user=user,
-                conversation_id=f"seed-{i}"
-            )
-            
-            if result.final_message:
-                # Check if SQL was executed
-                sql_executed = any(
-                    hasattr(step, 'tool_name') and step.tool_name == 'run_sql'
-                    for step in result.steps
-                )
-                
-                if sql_executed:
-                    print(f"  ✅ Saved to Tool Memory")
-                else:
-                    print(f"  ⚠️  No SQL executed (might be a follow-up)")
-            
+            ctx = RequestContext(headers={"X-User-ID": user.id})
+            simple_responses = []
+            async for component in agent.send_message(
+                request_context=ctx,
+                message=query,
+                conversation_id=f"seed-{i}",
+            ):
+                simple = getattr(component, "simple_component", None)
+                if simple and hasattr(simple, "text"):
+                    simple_responses.append(simple.text)
+
+            if simple_responses:
+                print(f"  ✅ Seeded (response captured)")
+            else:
+                print(f"  ⚠️  Seeded, but no simple text response captured")
+
         except Exception as e:
             print(f"  ❌ Error: {str(e)}")
         

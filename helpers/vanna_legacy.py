@@ -1,6 +1,6 @@
 """
-Vanna client helper for Text-to-SQL functionality (Azure OpenAI preferred).
-Provides a singleton pattern for Vanna instance.
+Legacy Vanna (0.x) helper for Text-to-SQL tools.
+Uses the legacy OpenAI_Chat + ChromaDB_VectorStore stack.
 """
 import os
 from functools import lru_cache
@@ -12,8 +12,9 @@ from django.conf import settings
 CHROMA_VANNA_PATH = str(settings.BASE_DIR / "chroma_vanna")
 
 
-# Vanna class using OpenAI/Azure client for LLM and ChromaDB for vector storage
-class VannaOpenAI(ChromaDB_VectorStore, OpenAI_Chat):
+class VannaLegacy(ChromaDB_VectorStore, OpenAI_Chat):
+    """Legacy Vanna class for Text-to-SQL."""
+
     def __init__(self, config=None, client=None):
         ChromaDB_VectorStore.__init__(self, config=config)
         OpenAI_Chat.__init__(self, config=config, client=client)
@@ -22,10 +23,8 @@ class VannaOpenAI(ChromaDB_VectorStore, OpenAI_Chat):
 @lru_cache(maxsize=1)
 def get_vanna_client():
     """
-    Returns an initialized Vanna client.
-
+    Returns an initialized legacy Vanna client.
     Prefers Azure OpenAI if AZURE_OPENAI_* are set; otherwise falls back to OpenAI.
-    Uses ChromaDB for storing training data (DDL, docs, SQL examples).
     """
     azure_key = os.getenv("AZURE_OPENAI_API_KEY")
     azure_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
@@ -49,13 +48,10 @@ def get_vanna_client():
 
     config = {
         "model": model,
-        "path": CHROMA_VANNA_PATH,  # ChromaDB storage path
+        "path": CHROMA_VANNA_PATH,
     }
 
-    vn = VannaOpenAI(config=config, client=client)
-
-    # Connect to Django's SQLite database
+    vn = VannaLegacy(config=config, client=client)
     db_path = str(settings.DATABASES["default"]["NAME"])
     vn.connect_to_sqlite(db_path)
-
     return vn

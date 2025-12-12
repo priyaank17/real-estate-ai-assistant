@@ -1,5 +1,5 @@
 from langchain_core.tools import tool
-from helpers.vanna import get_vanna_client
+from helpers.vanna_legacy import get_vanna_client
 
 @tool
 def execute_sql_query(query: str) -> str:

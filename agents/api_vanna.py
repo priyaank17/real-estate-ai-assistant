@@ -5,8 +5,10 @@ Alternative API endpoint using Vanna 2.0 agent framework.
 """
 from ninja import NinjaAPI, Schema
 from ninja.responses import Response
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 import uuid
+from vanna.core.user import User, RequestContext
+from vanna.components.simple import SimpleComponentType, SimpleTextComponent
 from vanna_agent import create_vanna_agent
 
 # Create API
@@ -47,18 +49,28 @@ async def chat(request, payload: ChatRequest):
     try:
         conversation_id = payload.conversation_id or str(uuid.uuid4())
         user_id = payload.user_id or "demo-user"
-        
-        # Execute agent (simplified for Vanna 2.0 API)
-        # Note: Actual execution will depend on Vanna's execute API
-        # For now, return a basic response structure
-        
+
+        # Build request context so SimpleUserResolver picks up user_id from headers
+        ctx = RequestContext(headers={"X-User-ID": user_id})
+
+        # Stream UI components and collect simple text responses
+        texts: List[str] = []
+        async for component in vanna_agent.send_message(
+            request_context=ctx,
+            message=payload.message,
+            conversation_id=conversation_id,
+        ):
+            simple = getattr(component, "simple_component", None)
+            if isinstance(simple, SimpleTextComponent):
+                texts.append(simple.text)
+
+        response_text = texts[-1] if texts else "No response."
+        metadata = {"user_id": user_id, "tools_used": None}
+
         return {
-            "response": f"Vanna 2.0 received: {payload.message}",
+            "response": response_text,
             "conversation_id": conversation_id,
-            "metadata": {
-                "user_id": user_id,
-                "tools_available": ["run_sql", "investment", "comparison", "booking", "similarity"]
-            }
+            "metadata": metadata,
         }
     except Exception as e:
         return Response(
@@ -67,9 +79,7 @@ async def chat(request, payload: ChatRequest):
         )
 
 
-# Add CORS headers middleware
-@api_vanna.api_controller("/", tags=["Root"])
-class RootController:
-    @api_vanna.get("/")
-    def root(self, request):
-        return {"message": "Vanna 2.0 API", "version": "2.0"}
+# Root endpoint
+@api_vanna.get("/")
+def root(request):
+    return {"message": "Vanna 2.0 API", "version": "2.0"}
