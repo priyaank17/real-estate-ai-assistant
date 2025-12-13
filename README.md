@@ -7,6 +7,8 @@ This flow **does not rely on a RAG tool** for answering semantic questions; inst
 
 **There is also an agentic (LLM-decides-tools) flow on the `main` branch** if you prefer that style: https://github.com/priyaank17/real-estate-ai-assistant/tree/main.
 
+![alt text](image.png)
+
 ---
 ## Project structure (key dirs)
 ```
@@ -32,7 +34,8 @@ git clone https://github.com/priyaank17/real-estate-ai-assistant.git
 cd real-estate-ai-assistant
 python -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
-pip install -r requirements.txt
+python3 -m pip install --upgrade pip
+python3 -m pip install --no-cache-dir -r requirements.txt
 ```
 
 **Configure env & migrate**
