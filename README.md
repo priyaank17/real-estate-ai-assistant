@@ -10,9 +10,10 @@ Agentic real-estate concierge built on Django + LangGraph where the LLM dynamica
 ```bash
 git clone https://github.com/priyaank17/real-estate-ai-assistant.git
 cd real-estate-ai-assistant
-python -m venv venv
+python3 -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
-pip install -r requirements.txt
+python3 -m pip install --upgrade pip
+python3 -m pip install --no-cache-dir -r requirements.txt
 ```
 
 **Configure env & migrate**
