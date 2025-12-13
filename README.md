@@ -1,564 +1,237 @@
-# Silver Land Properties AI Assistant
+# Silver Land Properties AI Assistant — LangGraph-based deterministic workflow
 
-**Production-grade real estate AI agent with two implementations:**
-- **Approach 1 (main)**: LangGraph + OpenAI + Custom Tools
-- **Approach 2 (feature/vanna2.0)**: Vanna 2.0 Agent Framework
+Production-grade real-estate concierge built on Django + LangGraph with deterministic tool routing (intent → SQL → detail/analysis → respond).
+Text-to-SQL is powered by **Vanna**; you can retrain/seed it with sample queries.
 
----
+This flow **does not rely on a RAG tool** for answering semantic questions; instead, it routes amenity/description questions to a **detail node** that surfaces the full project row (description, features, facilities) as context—acting like lightweight retrieval without embedding/indexing costs. Examples: “What amenities does The OWO Residences have?” or “Does this project include a cinema?” are answered from SQL/detail context, not a vector store. Uses Azure/OpenAI for LLM + embeddings (only needed if you optionally run the RAG ingestion script).
 
-## 🎯 Quick Start
-
-### Choose Your Implementation
-
-| Branch | Framework | Best For | Setup Time |
-|--------|-----------|----------|------------|
-| **main** | LangGraph + OpenAI | Full control, custom logic | 15 min |
-| **feature/vanna2.0** | Vanna 2.0 Agent | Auto-learning, less code | 10 min |
+**There is also an agentic (LLM-decides-tools) flow on the `main` branch** if you prefer that style: https://github.com/priyaank17/real-estate-ai-assistant/tree/main.
 
 ---
-
-## 📦 Installation (Both Approaches)
-
-### 1. Clone and Setup Environment
-
-```bash
-git clone <repo-url>
-cd real-estate-ai-assistant
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
-
-### 2. Choose Your Branch
-
-**Option A: LangGraph Approach (main)**
-```bash
-git checkout main
-pip install -r requirements.txt
-```
-
-**Option B: Vanna 2.0 Approach (feature/vanna2.0)**
-```bash
-git checkout feature/vanna2.0
-pip install -r requirements.txt
-pip install "vanna[openai,fastapi]>=2.0.0"
-```
-
-### 3. Configure Environment
-
-```bash
-# Copy example env file
-cp .env.example .env
-
-# Edit .env and add your OpenAI API key
-cat <<'EOF' > .env
-AZURE_OPENAI_API_KEY="<your-azure-openai-key>"
-AZURE_OPENAI_ENDPOINT="https://<your-resource>.openai.azure.com/"
-AZURE_OPENAI_API_VERSION="2024-05-01-preview"
-AZURE_OPENAI_CHAT_DEPLOYMENT="gpt-4o-mini"
-AZURE_OPENAI_EMBED_DEPLOYMENT="text-embedding-3-small"
-EOF
-```
-
-### 4. Setup Database
-
-```bash
-# Run migrations
-python manage.py migrate
-
-# Seed database with properties
-python scripts/seed_database.py
-```
-
-**Key tables**
-- `projects` (agents_project): property metadata
-- `leads` (agents_lead): first name, last name, email, preferences
-- `bookings` (agents_booking): legacy bookings
-- `visit_bookings` (visit_bookings): confirmed visit bookings (used by `book_viewing`)
-
-### 5. Optional: Setup RAG (Semantic Search)
-
-```bash
-# Ingest property descriptions for semantic search
-python scripts/ingest_rag.py
-```
-
-**Note**: This requires OpenAI embeddings.
-
----
-
-## 🚀 Running the Application
-
-### Approach 1: LangGraph (main branch)
-
-```bash
-# Make sure you're on main
-git checkout main
-
-# Start Django server
-python manage.py runserver 8000
-
-# Test endpoint
-curl -X POST http://localhost:8000/api/agents/chat \
-  -H "Content-Type: application/json" \
-  -d '{"message": "Find 2 bedroom apartments in Dubai"}'
-
-# Optional: start simple frontend (static)
-python -m http.server 4000 -d frontend
-# Visit http://localhost:4000 and set API_BASE if needed
-```
-
-**Features:**
-- ✅ Custom LangGraph agent
-- ✅ Manual tool orchestration
-- ✅ Full control over agent behavior
-- ✅ OpenAI LLM (gpt-4o-mini)
-
-### Approach 2: Vanna 2.0 (feature/vanna2.0 branch)
-
-```bash
-# Switch to Vanna 2.0
-git checkout feature/vanna2.0
-
-# Optional: Seed Tool Memory (for better cold start)
-python scripts/seed_vanna2_memory.py
-
-# Start Django server
-python manage.py runserver 8000
-
-# Test endpoint
-curl -X POST http://localhost:8000/api/vanna/chat \
-  -H "Content-Type: application/json" \
-  -d '{"message": "Find 2 bedroom apartments in Dubai"}'
-```
-
-**Features:**
-- ✅ Vanna 2.0 agent framework
-- ✅ Auto-learning Tool Memory (learns from usage)
-- ✅ Conversational memory
-- ✅ Semantic search via Context Enricher
-- ✅ Proactive booking strategy
-- ✅ Cross-selling / similar matches
-- ✅ Comprehensive monitoring & logging
-
----
-
-## 📁 Project Structure
-
-### Shared Structure (Both Branches)
-
+## Project structure (key dirs)
 ```
 real-estate-ai-assistant/
-├── agents/                    # Django app (web layer)
-│   ├── models.py             # Django models (Project, Lead, Booking)
-│   ├── api.py                # REST API (main branch)
-│   ├── api_vanna.py          # REST API (vanna2.0 branch)
-│   └── graph.py              # LangGraph setup (main branch)
-│
-├── tools/                     # Business logic tools (main branch)
-│   ├── sql_tool.py           # Text-to-SQL
-│   ├── rag_tool.py           # Semantic search
-│   ├── booking_tool.py       # Bookings
-│   ├── investment_tool.py    # ROI analysis
-│   └── comparison_tool.py    # Comparisons
-│
-├── helpers/                   # Utilities
-│   ├── vanna.py              # Vanna client (main: 0.x, vanna2.0: 2.0)
-│   └── vectorstore.py        # ChromaDB + embeddings
-│
-├── scripts/                   # Setup scripts
-│   ├── seed_database.py      # Seed DB from CSV
-│   ├── ingest_rag.py         # RAG ingestion
-│   ├── vanna_setup.py        # Vanna 0.x training (main)
-│   └── seed_vanna2_memory.py # Vanna 2.0 seeding (vanna2.0)
-│
-├── data/
-│   └── properties.csv        # 17k+ property listings
-│
-├── db.sqlite3                # SQLite database
-└── requirements.txt
+├── agents/          # Django app (API, LangGraph wiring, models)
+├── tools/           # SQL, booking, intent, investment, comparison tools
+├── frontend/        # Static chat UI (show-all rows toggle)
+├── scripts/         # seed_database.py, vanna_setup.py, ingest_rag.py
+├── helpers/         # Vanna client, vectorstore helpers
+├── docs/            # Architecture docs, setup guides
+├── data/            # properties.csv and other seeds
+├── silver_land/     # Django project settings/urls/wsgi
+├── db.sqlite3       # default SQLite DB
+├── tests/           # pytest-based tests (tools + API)
+└── manage.py        # Django entrypoint
 ```
 
-### Vanna 2.0 Specific (feature/vanna2.0 branch)
+## Quick Start (local dev)
 
-```
-├── vanna_agent.py            # Vanna 2.0 agent factory
-├── tools_vanna/              # Vanna-format tools
-│   ├── investment_tool_vanna.py
-│   ├── comparison_tool_vanna.py
-│   ├── booking_tool_vanna.py
-│   └── similarity_tool_vanna.py
-├── enrichers/                # Context enrichers
-│   └── description_enricher.py  # Semantic search enricher
-├── monitoring/               # Monitoring & logging
-│   └── vanna_monitor.py
-└── logs/
-    └── vanna_monitor.log
-```
-
----
-
-## 🛠️ Features Comparison
-
-| Feature | main (LangGraph) | feature/vanna2.0 (Vanna 2.0) |
-|---------|------------------|------------------------------|
-| **Text-to-SQL** | Custom implementation | Built-in `RunSqlTool` |
-| **Learning** | Static (manual training) | Dynamic (auto-learns from usage) |
-| **SQL Accuracy** | ~75% | ~90-95% (Tool Memory) |
-| **Conversational Memory** | Manual implementation | Built-in `MemoryConversationStore` |
-| **Semantic Search** | Custom RAG tool | Context Enricher (automatic) |
-| **Proactive Booking** | Manual strategy | Enhanced system prompt |
-| **Cross-Selling** | None | `FindSimilarPropertiesTool` |
-| **Monitoring** | None | Comprehensive (`VannaMonitor`) |
-| **Maintenance** | Medium | Low |
-| **Setup Complexity** | Medium | Low |
-| **Training Required** | Yes (Vanna 0.x) | No (optional seeding) |
-| **Code Lines** | ~1500 | ~800 |
-
----
-
-## 🎯 Challenge Requirements
-
-Both implementations satisfy all requirements:
-
-| Requirement | main | vanna2.0 |
-|-------------|------|----------|
-| Text-to-SQL | ✅ | ✅ |
-| Conversational Memory | ✅ | ✅ |
-| Proactive Booking | ✅ | ✅ |
-| Cross-Selling | ⚠️ Basic | ✅ Advanced |
-| Investment Analysis | ✅ | ✅ |
-| Property Comparison | ✅ | ✅ |
-| Semantic Search (RAG) | ✅ | ✅ |
-| Monitoring | ❌ | ✅ |
-
----
-
-## 📖 API Endpoints
-
-### Main Branch (`/api/agents/chat`)
-
+**Clone & install**
 ```bash
-curl -X POST http://localhost:8000/api/agents/chat \
-  -H "Content-Type: application/json" \
-  -d '{
-    "message": "Find 3 bedroom villas in Dubai",
-    "conversation_id": "optional-uuid"
-  }'
+git clone https://github.com/priyaank17/real-estate-ai-assistant.git
+cd real-estate-ai-assistant
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+pip install -r requirements.txt
 ```
 
-**Response:**
-```json
-{
-  "response": "I found 5 villas...",
-  "conversation_id": "uuid",
-  "data": {
-    "ids": [1, 2, 3],
-    "message": "Details..."
-  }
-}
-```
-
-### Vanna 2.0 Branch (`/api/vanna/chat`)
-
+**Configure env & migrate**
 ```bash
-curl -X POST http://localhost:8000/api/vanna/chat \
-  -H "Content-Type: application/json" \
-  -d '{
-    "message": "Find 3 bedroom villas in Dubai",
-    "conversation_id": "optional-uuid",
-    "user_id": "optional-user-id"
-  }'
+cp .env.example .env   # then edit with your keys
+python manage.py migrate
 ```
 
-**Response:**
-```json
-{
-  "response": "I found 5 villas...",
-  "conversation_id": "uuid",
-  "metadata": {
-    "tools_used": ["run_sql", "update_ui_context"],
-    "user_id": "demo-user"
-  }
-}
-```
-
----
-
-## 🔧 Configuration
-
-### Environment Variables
-
+**Seed data & train Vanna text-to-SQL**
 ```bash
-# Preferred: Azure OpenAI
-AZURE_OPENAI_API_KEY=<your-azure-openai-key>
-AZURE_OPENAI_ENDPOINT=https://<your-resource>.openai.azure.com/
-AZURE_OPENAI_API_VERSION=2024-05-01-preview
-AZURE_OPENAI_CHAT_DEPLOYMENT=gpt-4o-mini          # your chat deployment name
-AZURE_OPENAI_EMBED_DEPLOYMENT=text-embedding-3-small  # your embedding deployment name
-
-# Fallback (if Azure not set)
-# OPENAI_API_KEY=sk-your-key-here
-# OPENAI_LLM_MODEL=gpt-4o-mini
-# OPENAI_EMBEDDING_MODEL=text-embedding-3-small
+python scripts/seed_database.py
+python scripts/vanna_setup.py   # primes Vanna with schema + sample queries
 ```
 
-### Models Used
-
-| Component | main | vanna2.0 |
-|-----------|------|----------|
-| **LLM** | Azure OpenAI `gpt-4o-mini` deployment | Azure OpenAI `gpt-4o-mini` deployment |
-| **Embeddings** | Azure OpenAI `text-embedding-3-small` deployment | Azure OpenAI `text-embedding-3-small` deployment |
-| **Vector DB** | ChromaDB | ChromaDB |
-| **Database** | SQLite | SQLite |
-
----
-
-## 🧪 Testing
-
-### Test SQL Queries
-
+**Run backend**
 ```bash
-# Simple property search
-curl ... -d '{"message": "Show me apartments in Dubai"}'
-
-# Qualitative search (uses semantic search)
-curl ... -d '{"message": "Find luxury waterfront properties with pool"}'
-
-# Investment analysis
-curl ... -d '{"message": "Analyze investment for Burj Binghatti"}'
-
-# Comparison
-curl ... -d '{"message": "Compare Downtown Dubai vs Marina apartments"}'
-
-# Booking
-curl ... -d '{"message": "Book viewing for Burj Binghatti on 2024-12-20 for John (john@example.com)"}'
-```
-
-### Test Conversational Memory (Vanna 2.0)
-
-```bash
-# First message
-curl ... -d '{"message": "Find 2 bedroom apartments", "conversation_id": "test-1"}'
-
-# Follow-up (should remember context)
-curl ... -d '{"message": "What about the price of the first one?", "conversation_id": "test-1"}'
-```
-
-### View Monitoring Stats (Vanna 2.0)
-
-```python
-# In Django shell or script
-from monitoring.vanna_monitor import get_monitor
-
-monitor = get_monitor()
-monitor.print_stats()
-```
-
----
-
-## 📊 Monitoring & Logging (Vanna 2.0 Only)
-
-### Log Files
-
-- **Console**: INFO level
-- **File**: `logs/vanna_monitor.log` (DEBUG level)
-
-### Metrics Tracked
-
-- Total queries / success rate
-- SQL generation stats
-- Tool usage patterns
-- Average response times
-- Errors and exceptions
-
-### Example Stats Output
-
-```
-===========================================================================
-Total Queries:      50
-Successful:         47
-Failed:             3
-Success Rate:       94.0%
-SQL Generated:      40
-Tool Calls:         85
-Avg Response Time:  1.15s
-
-Tool Usage:
-  - run_sql: 40
-  - find_similar_properties: 8
-  - analyze_investment: 15
-  - compare_projects: 12
-  - book_viewing: 10
-===========================================================================
-```
-
----
-
-## 🎓 How Tool Memory Works (Vanna 2.0)
-
-**Vanna 2.0's killer feature:**
-
-```
-User Query 1: "Find 2 bedroom apartments"
-  → Agent generates SQL
-  → Executes successfully
-  → Vanna AUTO-SAVES: (question, SQL, schema) to Tool Memory ✅
-
-User Query 2: "Show me 3 bedroom apartments"
-  → Agent searches Tool Memory
-  → Finds similar query from Query 1
-  → Adapts SQL for 3 bedrooms
-  → Much higher accuracy! ✅
-```
-
-**Benefits:**
-- No manual training required
-- Gets smarter with usage
-- Learns your specific database patterns
-- 90-95% SQL accuracy after 10-20 queries
-
----
-
-## 🔀 Switching Between Implementations
-
-### Option 1: Switch Branches
-
-```bash
-# Use LangGraph
-git checkout main
-python manage.py runserver 8000
-
-# Use Vanna 2.0
-git checkout feature/vanna2.0
 python manage.py runserver 8000
 ```
 
-### Option 2: Run Both Simultaneously (A/B Testing)
-
+**Optional: static frontend**
 ```bash
-# Terminal 1: Main branch
-git checkout main
-python manage.py runserver 8000  # /api/agents/chat
-
-# Terminal 2: Vanna 2.0
-git checkout feature/vanna2.0  
-python manage.py runserver 8001  # /api/vanna/chat
+python -m http.server 4000 -d frontend   # visit http://localhost:4000
 ```
 
-Compare results and choose the best approach!
+### What the above does
+- **Install & configure**: sets up venv, installs deps, and applies migrations.
+- **Run backend**: `manage.py runserver` starts the LangGraph-powered API on port 8000.
+- **Run frontend (optional)**: static chat UI with show-all toggle for result tables on port 4000.
 
----
+### Vanna (text-to-SQL) setup
+- The SQL tool uses Vanna (helpers/vanna.py) for text-to-SQL.
+- Train/prime Vanna with schema + sample queries:
+  ```bash
+  # Ensure Azure/OpenAI keys are in .env
+  python scripts/vanna_setup.py
+  # (optionally) seed additional examples in scripts/seed_vanna2_memory.py
+  ```
+- You can add more examples by editing `scripts/vanna_setup.py` (the seed list includes common filters like city/bedrooms/price). Re-run the script whenever schema or examples change.
 
-## 🚨 Troubleshooting
-
-### Common Issues
-
-**1. "No module named 'vanna'"**
+Minimal `.env` (Azure strongly recommended):
 ```bash
-# On feature/vanna2.0 branch
-pip install "vanna[openai,fastapi]>=2.0.0"
-```
-
-**2. "No API key found"**
-```bash
-# Set Azure environment variables
-export AZURE_OPENAI_API_KEY="..."
-export AZURE_OPENAI_ENDPOINT="https://<your-resource>.openai.azure.com/"
-export AZURE_OPENAI_API_VERSION="2024-05-01-preview"
-export AZURE_OPENAI_CHAT_DEPLOYMENT="gpt-4o-mini"
-export AZURE_OPENAI_EMBED_DEPLOYMENT="text-embedding-3-small"
-
-# Or add to .env file
-cat <<'EOF' > .env
 AZURE_OPENAI_API_KEY="..."
-AZURE_OPENAI_ENDPOINT="https://<your-resource>.openai.azure.com/"
+AZURE_OPENAI_ENDPOINT="https://<resource>.openai.azure.com/"
 AZURE_OPENAI_API_VERSION="2024-05-01-preview"
 AZURE_OPENAI_CHAT_DEPLOYMENT="gpt-4o-mini"
 AZURE_OPENAI_EMBED_DEPLOYMENT="text-embedding-3-small"
-EOF
+# Fallback: OPENAI_API_KEY=... OPENAI_LLM_MODEL=gpt-4o-mini
 ```
 
-**3. "Vanna not trained" (main branch only)**
+---
+
+## Architecture (feature/langgraph-tools)
+
+Deterministic LangGraph (no LLM tool-calling ambiguity):
+
+```mermaid
+flowchart TD
+  UI[frontend/index.html\n+ Show-all toggle] -->|/api/agents/chat| API
+  API[agents/api.py] --> Graph
+
+  subgraph LangGraph
+    Intent(Intent\nextract_intent_filters + lead capture) -->|booking intent| Book
+    Intent -->|greeting/off-topic| Guard
+    Intent --> SQL
+
+    SQL(SQL\nexecute_sql_query + LIKE fallback) -->|detail ask| Detail
+    SQL -->|investment| Invest
+    SQL -->|comparison| Compare
+    SQL --> UI[UI sync\nupdate_ui_context]
+
+    Detail -->|booking| Book
+    Detail --> UI
+    Invest --> Respond
+    Compare --> Respond
+    UI --> Respond
+    Book --> END
+    Respond --> END
+  end
+```
+
+Routing rules (high level):
+- **Intent**: extracts filters (city/price/beds/type/features), project/developer, detail/listing flag, investment/comparison intent, greeting/off-topic, lead name/email (stored immediately).
+- **SQL**: Vanna text-to-SQL; for project/dev/feature queries uses broad LIKE across name/description/features/facilities/developer/city. Shortlist is replaced each turn. Preview limited to 3 rows; full rows are sent via `data_sync` for the frontend “Show all rows” table.
+- **Detail**: best-match row by project name from current SQL rows; falls back to direct fetch. Drops “project name not available”.
+- **Investment/Comparison**: run tools on selected/shortlist ids.
+- **Booking**: resolves project from shortlist/selection/name; requires email; books via `book_viewing` and returns confirmation without the LLM.
+- **Respond**: detail mode uses only the detail row (amenities/description/all columns). Listing mode summarizes up to 3 matches; sends `data_sync` payload (rows/row_count/preview) for UI rendering.
+
+---
+
+## Tools
+- `extract_intent_filters` — intent + filters + lead parsing, flags for greeting/off-topic/detail/investment/comparison.
+- `execute_sql_query` — Vanna SQL + LIKE fallback; returns rows, `row_count`, `project_ids`, `preview_markdown`.
+- `fetch_project_row` — single project with all columns (features/facilities/description).
+- `update_ui_context` — sync shortlist ids to the browser.
+- `book_viewing` — upserts lead, writes visit booking; confirmation returned directly.
+- `analyze_investment` — price-per-sqm, yield heuristic, investment score for selected/top projects.
+- `compare_properties` — side-by-side metrics + preview table for 2 projects.
+- `data_sync` (virtual) — emitted by `respond`; carries rows/row_count/preview/detail so the UI can render previews and the “Show all rows” table.
+
+## Models used (this flow)
+- **Chat/agent & intent LLM**: Azure OpenAI (`AZURE_OPENAI_*` + `AZURE_OPENAI_CHAT_DEPLOYMENT`) if set; otherwise OpenAI (`OPENAI_API_KEY` + `OPENAI_LLM_MODEL`). Optional: set `USE_OLLAMA_FOR_INTENT=true` + `OLLAMA_MODEL` to force intent extraction to use Ollama; if not set, Ollama is ignored.
+- **Text-to-SQL (Vanna)**: uses the same Azure/OpenAI keys defined above.
+- **Embeddings**: only needed if you run `scripts/ingest_rag.py` (uses `AZURE_OPENAI_EMBED_DEPLOYMENT` or `OPENAI_EMBEDDING_MODEL`).
+
+## Key tables
+- `projects` (`agents_project`): property metadata (name, city, beds, price, description, features/facilities, etc.).
+- `leads` (`agents_lead`): first name, last name, email, preferences.
+- `bookings` (`agents_booking`): legacy bookings.
+- `visit_bookings` (`visit_bookings`): confirmed visit bookings (used by `book_viewing`).
+
+---
+
+## API
+
+### `POST /api/agents/chat`
 ```bash
-# Run training script
-python scripts/vanna_setup.py
+curl -X POST http://localhost:8000/api/agents/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Find apartments in Dubai under 2M"}'
 ```
 
-**4. "No results from RAG"**
+Sample response (listing):
+```json
+{
+  "response": "Here are 3 matches under 2M USD in Dubai: ...",
+  "conversation_id": "uuid",
+  "data": {
+    "rows": [
+      {"id": "a73e...", "name": "Safa One by de Grisogono", "city": "Dubai", "bedrooms": 3, "price": 1005159},
+      {"id": "06c4...", "name": "Altitude by Damac & de Grisogono", "city": "Dubai", "bedrooms": 2, "price": 1203365}
+    ],
+    "row_count": 26,
+    "shortlisted_project_ids": ["a73e...", "06c4...", "..."],
+    "preview_markdown": "| id | name | city | price | ... |"
+  },
+  "tools_used": ["extract_intent_filters", "execute_sql_query", "update_ui_context", "data_sync"],
+  "preview_markdown": "| id | name | city | price | ... |",
+  "citations": [
+    {"project_id": "a73e...", "project_name": "Safa One by de Grisogono", "city": "Dubai"}
+  ]
+}
+```
+
+Detail response includes `data.detail` with all columns. Booking confirmations return a plain message plus booking id (no LLM).
+
+### `POST /api/agents/conversations`
+Creates a conversation id for threading multiple `/chat` calls.
 ```bash
-# Ingest property descriptions
-python scripts/ingest_rag.py
+curl -X POST http://localhost:8000/api/agents/conversations
+# -> {"conversation_id": "<uuid>"}
 ```
 
-**5. Ollama embedding errors**
-- Solution: Use OpenAI embeddings (already configured)
-- Or: Fix Ollama (reduce batch size, add retries)
+### `GET /api/agents/chat/stream`
+Server-sent events version of `/chat`; emits incremental `chunk` events and a final payload with the same fields as `/chat`.
 
 ---
 
-## 📚 Documentation
+## Frontend (static)
+- `frontend/index.html` consumes the API; shows chat, tools used, citations, preview table.
+- “Show all rows” toggle renders the full table from `data.rows` when present; default view shows the 3-row preview.
+- Use “Reset storage” to clear `api_base`/conversation in localStorage if switching backends.
 
-### Main Branch Documentation
-- `README.md` - This file
-- `OPENAI_SETUP.md` - OpenAI migration guide
-- `VANNA_SETUP.md` - Vanna 0.x training
-
-### Vanna 2.0 Documentation
-- `VANNA2_README.md` - Vanna 2.0 overview
-- `VANNA2_FEATURES.md` - Complete feature list
-- `TRAINING_COMPARISON.md` - Vanna 0.x vs 2.0
-- `BRANCH_GUIDE.md` - Branch switching guide
+Start:
+```bash
+python -m http.server 4000 -d frontend
+# then open http://localhost:4000 (set API_BASE if not http://localhost:8000)
+```
 
 ---
 
-## 🎯 Recommendation
-
-### For Production
-
-**Choose Vanna 2.0** (`feature/vanna2.0`) if:
-- ✅ You want auto-learning (gets better over time)
-- ✅ You want less code to maintain
-- ✅ You want built-in monitoring
-- ✅ You prioritize SQL accuracy (90-95%)
-- ✅ You want faster setup
-
-**Choose LangGraph** (`main`) if:
-- ✅ You need full control over agent behavior
-- ✅ You want to customize every detail
-- ✅ You're familiar with LangGraph
-- ✅ You want to avoid new frameworks
-
-### For Learning/Comparison
-
-Run **both branches** side-by-side and compare:
-- SQL generation quality
-- Response accuracy
-- Maintenance overhead
-- Feature completeness
+## Optional: RAG Ingestion
+Semantic search over descriptions/facilities (used when enabled):
+```bash
+python scripts/ingest_rag.py   # uses Azure/OpenAI embeddings
+```
 
 ---
 
-## 🤝 Contributing
-
-1. Create feature branch from `main` or `feature/vanna2.0`
-2. Make changes
-3. Test thoroughly
-4. Submit pull request
-
----
-
-## 📄 License
-
-MIT License
+## Testing Tips
+- SQL search: `{"message": "Find 2 bedroom apartments in Dubai"}`.
+- Detail: `{"message": "Amenities for The OWO Residences London"}`.
+- Booking: `{"message": "Book my visit to Downtown Dubai Residences for Priya (priya@example.com)"}`.
+- Investment: `{"message": "Investment analysis for The OWO Residences"}`.
+- Comparison: `{"message": "Compare Burj Binghatti and Safa One"}`.
 
 ---
 
-## 🔗 Links
-
-- Vanna 2.0 Docs: https://vanna.ai/docs/
-- LangGraph Docs: https://python.langchain.com/docs/langgraph
-- OpenAI API: https://platform.openai.com/docs
+## Troubleshooting
+- **No key / 401**: ensure Azure variables are set in `.env`.
+- **429 / rate limits**: reduce requests or switch to a different deployment.
+- **Bad JSON in UI**: data_sync now strips NaN/inf; clear localStorage and retry.
+- **Booking shows raw dict**: booking flow now emits a human-readable confirmation (no LLM call).
 
 ---
 
-**Built with ❤️ using OpenAI, Vanna 2.0, and LangGraph**
+### Tests
+- The `tests/` folder exercises tools and API surfaces. To run:
+```bash
+pytest -q
+```
+Ensure your `.env` has valid Azure/OpenAI keys and that you’ve migrated/seeded the database before running. Test doubles patch tool outputs where needed; update snapshots if you adjust tool schemas.

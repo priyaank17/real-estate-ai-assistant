@@ -1,3 +1,6 @@
+import os
+os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+
 from ninja import NinjaAPI, Schema
 import json
 from typing import List, Optional, Dict, Any
@@ -5,18 +8,19 @@ import uuid
 import asyncio
 from langgraph.errors import GraphRecursionError
 from django.http import StreamingHttpResponse
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import HumanMessage, ToolMessage
 from agents.graph import create_agent_graph
+import logging
 
 # Import local tools
-from tools.sql_tool import execute_sql_query
-from tools.web_tool import web_search
+from tools.sql_tool import execute_sql_query, fetch_project_row
 from tools.intent_tool import extract_intent_filters
-from tools.investment_tool import analyze_investment
-from tools.comparison_tool import compare_projects
-from tools.rag_tool import search_rag
 from tools.ui_tool import update_ui_context
 from tools.booking_tool import book_viewing
+from tools.investment_tool import analyze_investment
+from tools.comparison_tool import compare_properties
+
+logger = logging.getLogger(__name__)
 
 api = NinjaAPI(title="Silver Land Properties Agent API")
 
@@ -24,12 +28,11 @@ api = NinjaAPI(title="Silver Land Properties Agent API")
 local_tools = [
     extract_intent_filters,
     execute_sql_query,
-    web_search,
-    analyze_investment,
-    compare_projects,
-    search_rag,
+    fetch_project_row,
     update_ui_context,
-    book_viewing
+    book_viewing,
+    analyze_investment,
+    compare_properties,
 ]
 
 # Create agent app with local tools and memory (custom graph by default)
@@ -58,7 +61,8 @@ def create_conversation(request):
 
 def _extract_structured(result: Dict[str, Any]):
     last_msg = result["messages"][-1]
-    structured_data = {}
+    structured_data = None
+    raw_data_sync = None
     tools_used = []
     preview_markdown = None
     citations = None
@@ -72,11 +76,58 @@ def _extract_structured(result: Dict[str, Any]):
             break
     current_turn = messages[start_idx:]
 
+    tool_message_seen = False
+
+    # Debug log message types to ensure data_sync is visible
+    for msg in result.get("messages", []):
+        try:
+            snippet = getattr(msg, "content", None)
+            if isinstance(snippet, str) and len(snippet) > 160:
+                snippet = snippet[:160] + "...("
+            logger.info(f"[api.debug] msg type={type(msg)} name={getattr(msg, 'name', None)} tool_calls={getattr(msg, 'tool_calls', None)} content_type={type(getattr(msg, 'content', None))} content_snippet={snippet}")
+        except Exception:
+            pass
+
+    # First, try to find the latest data_sync ToolMessage (full conversation), highest priority
+    def _parse_content(payload):
+        if isinstance(payload, dict):
+            return payload
+        if isinstance(payload, str):
+            try:
+                return json.loads(payload)
+            except Exception:
+                try:
+                    import ast
+                    parsed = ast.literal_eval(payload)
+                    if isinstance(parsed, dict):
+                        return parsed
+                except Exception:
+                    return {"raw": payload}
+        return None
+
+    data_sync_payload = None
+    for msg in reversed(result.get("messages", [])):
+        if isinstance(msg, ToolMessage) and (getattr(msg, "name", None) == "data_sync" or getattr(msg, "tool_call_id", None) == "data_sync"):
+            parsed = _parse_content(getattr(msg, "content", None))
+            if parsed:
+                data_sync_payload = parsed
+                break
+
     for msg in current_turn:
-        if getattr(msg, "type", None) == "tool":
+        if isinstance(msg, ToolMessage):
+            name = getattr(msg, "name", None) or getattr(msg, "tool_call_id", None)
+            if name:
+                tools_used.append(name)
+            tool_message_seen = True
+            if name == "data_sync" and isinstance(msg.content, dict):
+                structured_data = msg.content
+                if msg.content.get("preview_markdown") and not preview_markdown:
+                    preview_markdown = msg.content.get("preview_markdown")
+        if getattr(msg, "type", None) == "tool" or getattr(msg, "name", None):
             name = getattr(msg, "name", None) or getattr(msg, "tool_call", {}).get("name") if hasattr(msg, "tool_call") else None
             if name:
                 tools_used.append(name)
+            tool_message_seen = True
         if hasattr(msg, "tool_calls") and msg.tool_calls:
             for tc in msg.tool_calls:
                 tool_name = tc.get("name")
@@ -86,7 +137,7 @@ def _extract_structured(result: Dict[str, Any]):
     sql_preview = None
     fallback_preview = None
     for msg in reversed(current_turn):
-        if getattr(msg, "type", None) == "tool":
+        if getattr(msg, "type", None) == "tool" or isinstance(msg, ToolMessage):
             parsed = None
             if isinstance(msg.content, dict):
                 parsed = msg.content
@@ -96,6 +147,8 @@ def _extract_structured(result: Dict[str, Any]):
                 except Exception:
                     parsed = None
             if isinstance(parsed, dict):
+                if not tools_used and parsed.get("source_tool"):
+                    tools_used.append(parsed.get("source_tool"))
                 if parsed.get("preview_markdown"):
                     if parsed.get("source_tool") == "execute_sql_query" and not sql_preview:
                         sql_preview = parsed.get("preview_markdown")
@@ -110,6 +163,25 @@ def _extract_structured(result: Dict[str, Any]):
                         filtered.append(item)
                     if filtered:
                         citations = filtered
+                if parsed.get("rows") and not citations:
+                    filtered = []
+                    for item in parsed.get("rows", []):
+                        name = item.get("name") or item.get("project_name")
+                        pid = item.get("id") or item.get("project_id")
+                        if name in (None, "", "nan"):
+                            continue
+                        filtered.append({"project_id": pid, "project_name": name, "city": item.get("city")})
+                    if filtered:
+                        citations = filtered
+                # detail payload as citation
+                if parsed.get("project_id") and parsed.get("project_name") and not citations:
+                    citations = [{
+                        "project_id": parsed.get("project_id"),
+                        "project_name": parsed.get("project_name"),
+                        "city": parsed.get("city"),
+                    }]
+                if parsed.get("shortlisted_project_ids") and not structured_data:
+                    structured_data = {"shortlisted_project_ids": parsed.get("shortlisted_project_ids")}
             if (sql_preview or fallback_preview) and citations:
                 break
     preview_markdown = sql_preview or fallback_preview
@@ -130,12 +202,51 @@ def _extract_structured(result: Dict[str, Any]):
             tools_used_deduped.append(t)
             seen.add(t)
 
+    # Explicitly capture any data_sync payloads (current turn first)
+    def _harvest(messages):
+        for msg in messages:
+            if isinstance(msg, ToolMessage):
+                if isinstance(msg.content, dict) and msg.content:
+                    return msg.content
+                if isinstance(msg.content, str):
+                    logger.info(f"[api.harvest] attempting to parse string content len={len(msg.content)} name={getattr(msg, 'name', None)} snippet={msg.content[:120]}")
+                    try:
+                        parsed = json.loads(msg.content)
+                        if isinstance(parsed, dict) and parsed:
+                            return parsed
+                    except Exception:
+                        try:
+                            import ast
+                            parsed = ast.literal_eval(msg.content)
+                            if isinstance(parsed, dict) and parsed:
+                                return parsed
+                        except Exception:
+                            # last resort: return raw string in a dict
+                            return {"raw": msg.content}
+        return None
+
+    # Always prefer full data_sync payload when available
+    if data_sync_payload:
+        structured_data = data_sync_payload
+        raw_data_sync = data_sync_payload
+    if structured_data is None:
+        structured_data = _harvest(current_turn)
+    if structured_data is None:
+        structured_data = _harvest(result.get("messages", []))
+
+    if structured_data and structured_data.get("preview_markdown") and not preview_markdown:
+        preview_markdown = structured_data.get("preview_markdown")
+
+    logger.info(f"[api._extract_structured] tool_message_seen={tool_message_seen} tools_used={tools_used_deduped} has_data={structured_data is not None} preview={'yes' if preview_markdown else 'no'} citations={'yes' if citations else 'no'} parsed_data_type={type(structured_data)}")
+
     return {
         "response": last_msg.content,
-        "structured_data": structured_data if structured_data else None,
+        "structured_data": structured_data if structured_data is not None else None,
+        "raw_data_sync": raw_data_sync,
         "tools_used": tools_used_deduped if tools_used_deduped else None,
         "preview_markdown": preview_markdown,
         "citations": citations if citations else None,
+        "tool_message_seen": tool_message_seen,
     }
 
 def _is_toolless_greeting(text: str) -> bool:
@@ -184,7 +295,7 @@ async def chat(request, payload: ChatRequest):
         "configurable": {"thread_id": conversation_id},
         "recursion_limit": 8,
     }
-    initial_state = {"messages": [HumanMessage(content=payload.message)]}
+    initial_state = {"messages": [HumanMessage(content=payload.message)], "intent": {}}
     try:
         result = await agent_app.ainvoke(initial_state, config=config)
     except GraphRecursionError:
@@ -197,6 +308,11 @@ async def chat(request, payload: ChatRequest):
             "citations": None,
         }
     payload_out = _extract_structured(result)
+    data_field = payload_out.get("structured_data")
+    if data_field is None:
+        data_field = payload_out.get("raw_data_sync")
+    if data_field is None and payload_out.get("tool_message_seen"):
+        data_field = {}
 
     # Hard guard: if no tool outputs (no preview, no citations, no shortlist), avoid invented projects
     if (
@@ -205,6 +321,7 @@ async def chat(request, payload: ChatRequest):
         and not payload_out["citations"]
         and not _is_toolless_greeting_any(payload_out["response"], user_text)
         and not _is_clarifying_question(payload_out["response"])
+        and not payload_out.get("tool_message_seen")
     ):
         return {
             "response": "I couldn't run SQL/RAG yet because key filters are missing. Please share city, budget range, and bedrooms so I can search.",
@@ -215,10 +332,25 @@ async def chat(request, payload: ChatRequest):
             "citations": None,
         }
 
+    resp_text = payload_out["response"]
+    # If the response is a JSON-like dict string from booking prompts, unwrap a cleaner message
+    if isinstance(resp_text, str) and resp_text.startswith("{") and "book" in resp_text.lower():
+        try:
+            import ast, json
+            parsed = None
+            try:
+                parsed = json.loads(resp_text)
+            except Exception:
+                parsed = ast.literal_eval(resp_text)
+            if isinstance(parsed, dict) and parsed.get("message"):
+                resp_text = parsed["message"]
+        except Exception:
+            pass
+
     return {
-        "response": payload_out["response"],
+        "response": resp_text,
         "conversation_id": conversation_id,
-        "data": payload_out["structured_data"],
+        "data": data_field,
         "tools_used": payload_out["tools_used"],
         "preview_markdown": payload_out["preview_markdown"],
         "citations": payload_out["citations"],
@@ -237,7 +369,7 @@ def chat_stream(request, message: str, conversation_id: Optional[str] = None):
     }
 
     async def run_agent():
-        initial_state = {"messages": [HumanMessage(content=message)]}
+        initial_state = {"messages": [HumanMessage(content=message)], "intent": {}}
         return await agent_app.ainvoke(initial_state, config=config)
 
     def event_stream():
@@ -269,6 +401,7 @@ def chat_stream(request, message: str, conversation_id: Optional[str] = None):
                 and not payload["citations"]
                 and not _is_toolless_greeting_any(payload["response"], message or "")
                 and not _is_clarifying_question(payload["response"])
+                and not payload.get("tool_message_seen")
             ):
                 # Hard guard streaming path
                 final_guard = {

@@ -5,8 +5,11 @@ import contextlib
 from langchain_core.tools import tool
 
 from helpers.vanna import get_vanna_client
+from agents.models import Project
 
 MAX_ROWS_RETURNED = 50
+
+
 
 
 @tool
@@ -98,7 +101,6 @@ def execute_sql_query(query: str) -> Dict[str, Any]:
             "project_ids": project_ids,
             "source_tool": "execute_sql_query",
         }
-
         return payload
 
     except Exception as e:
@@ -110,4 +112,52 @@ def execute_sql_query(query: str) -> Dict[str, Any]:
             "row_count": 0,
             "truncated": False,
             "project_ids": [],
+            "preview_markdown": "",
+            "source_tool": "execute_sql_query",
         }
+
+
+@tool
+def fetch_project_row(project_id_or_name: str) -> Dict[str, Any]:
+    """
+    Fetch a single project row by UUID or name (case-insensitive, first match).
+    Returns all columns for downstream LLM use (amenities, description, etc.).
+    """
+    try:
+        qs = Project.objects
+        project = None
+        if len(project_id_or_name) >= 32:
+            project = qs.filter(id__icontains=project_id_or_name).first()
+        if project is None:
+            project = qs.filter(name__icontains=project_id_or_name).first()
+        if project is None:
+            # Retry with punctuation stripped/replaced by space to catch "mr.c" vs "mr c"
+            import re
+            cleaned = re.sub(r"[^A-Za-z0-9]+", " ", project_id_or_name)
+            cleaned = re.sub(r"\\s{2,}", " ", cleaned).strip()
+            if cleaned:
+                project = qs.filter(name__icontains=cleaned).first()
+        if project is None:
+            return {"error": "Project not found.", "project_id": None, "source_tool": "fetch_project_row"}
+        payload = {
+            "project_id": str(project.id),
+            "project_name": project.name,
+            "city": project.city,
+            "country": project.country,
+            "property_type": project.property_type,
+            "unit_type": project.unit_type,
+            "status": project.status,
+            "completion_date": project.completion_date,
+            "developer": project.developer,
+            "bedrooms": project.bedrooms,
+            "bathrooms": project.bathrooms,
+            "price": float(project.price) if project.price is not None else None,
+            "area": project.area,
+            "features": project.features,
+            "facilities": project.facilities,
+            "description": project.description,
+            "source_tool": "fetch_project_row",
+        }
+        return payload
+    except Exception as e:
+        return {"error": f"Error fetching project: {str(e)}", "project_id": None, "source_tool": "fetch_project_row"}

@@ -199,23 +199,35 @@
         content.textContent = m.content;
         bubble.appendChild(label);
         bubble.appendChild(content);
-        if (m.meta && (m.meta.tools?.length || m.meta.shortlist?.length || m.meta.preview || m.meta.citations?.length)) {
+        if (m.meta && (m.meta.tools?.length || m.meta.shortlist?.length || m.meta.preview || m.meta.citations?.length || m.meta.rows)) {
           const metaBox = document.createElement("div");
           metaBox.className = "meta-block";
-          if (m.meta.tools?.length) {
-            const toolsRow = document.createElement("div");
-            toolsRow.innerHTML = `<span class="pill">Tools</span> ${m.meta.tools.map(t => `<span class="pill">${t}</span>`).join(" ")}`;
-            metaBox.appendChild(toolsRow);
-          }
-          if (m.meta.shortlist?.length) {
-            const slRow = document.createElement("div");
-            slRow.innerHTML = `<span class="pill">Shortlist</span> ${m.meta.shortlist.map(id => `<span class="id-chip">${id}</span>`).join(" ")}`;
-            metaBox.appendChild(slRow);
-          }
+          // Preview table (sample) first
           if (m.meta.preview) {
             const tbl = renderMarkdownTable(m.meta.preview);
             metaBox.appendChild(tbl);
           }
+          if (m.meta.rowCount) {
+            const countRow = document.createElement("div");
+            countRow.innerHTML = `<span class="pill">Total rows: ${m.meta.rowCount}</span>`;
+            metaBox.appendChild(countRow);
+          }
+          if (m.meta.rows && Array.isArray(m.meta.rows) && m.meta.rows.length) {
+            const btn = document.createElement("button");
+            btn.className = "pill";
+            btn.textContent = `Show all rows (${m.meta.rowCount || m.meta.rows.length})`;
+            const tblWrap = document.createElement("div");
+            tblWrap.style.display = "none";
+            tblWrap.appendChild(renderTableFromRows(m.meta.rows));
+            btn.onclick = () => {
+              const open = tblWrap.style.display === "block";
+              tblWrap.style.display = open ? "none" : "block";
+              btn.textContent = (open ? "Show all rows" : "Hide rows") + ` (${m.meta.rowCount || m.meta.rows.length})`;
+            };
+            metaBox.appendChild(btn);
+            metaBox.appendChild(tblWrap);
+          }
+          // Citations next
           if (m.meta.citations?.length) {
             const toggle = document.createElement("button");
             toggle.className = "pill";
@@ -238,6 +250,13 @@
             metaBox.appendChild(toggle);
             metaBox.appendChild(citWrap);
           }
+          // Tools and shortlist last
+          if (m.meta.tools?.length) {
+            const toolsRow = document.createElement("div");
+            toolsRow.innerHTML = `<span class="pill">Tools</span> ${m.meta.tools.map(t => `<span class="pill">${t}</span>`).join(" ")}`;
+            metaBox.appendChild(toolsRow);
+          }
+          // Shortlist is hidden in UI to reduce clutter
           bubble.appendChild(metaBox);
         }
         row.appendChild(avatar);
@@ -292,14 +311,17 @@
         }
         const data = await res.json();
         const assistantMsg = data.response || "[no response]";
+        const dataPayload = data.data || {};
         session.messages.push({
           role: "assistant",
           content: assistantMsg,
           meta: {
             tools: data.tools_used || [],
             shortlist: (data.data && data.data.shortlisted_project_ids) || [],
-            preview: data.preview_markdown || null,
-            citations: data.citations || []
+            preview: data.preview_markdown || dataPayload.preview_markdown || null,
+            citations: data.citations || [],
+            rows: dataPayload.rows || null,
+            rowCount: dataPayload.row_count || null
           }
         });
         renderMessages(session.messages);
@@ -358,6 +380,7 @@
       }
       const headers = lines[0].split("|").map(s => s.trim()).filter(Boolean);
       const rows = lines.slice(2).map(line => line.split("|").map(s => s.trim()).filter(Boolean));
+      const limitedRows = rows.slice(0, 3);
       const wrapper = document.createElement("div");
       wrapper.className = "table-wrapper";
       const table = document.createElement("table");
@@ -367,9 +390,39 @@
       thead.appendChild(thr);
       table.appendChild(thead);
       const tbody = document.createElement("tbody");
-      rows.forEach(r => {
+      limitedRows.forEach(r => {
         const tr = document.createElement("tr");
         r.forEach(cell => { const td = document.createElement("td"); td.textContent = cell; tr.appendChild(td); });
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+      wrapper.appendChild(table);
+      return wrapper;
+    }
+
+    function renderTableFromRows(rows) {
+      if (!rows || !rows.length) {
+        const pre = document.createElement("pre");
+        pre.textContent = "No rows";
+        return pre;
+      }
+      const cols = Object.keys(rows[0]);
+      const wrapper = document.createElement("div");
+      wrapper.className = "table-wrapper";
+      const table = document.createElement("table");
+      const thead = document.createElement("thead");
+      const thr = document.createElement("tr");
+      cols.forEach(h => { const th = document.createElement("th"); th.textContent = h; thr.appendChild(th); });
+      thead.appendChild(thr);
+      table.appendChild(thead);
+      const tbody = document.createElement("tbody");
+      rows.forEach(r => {
+        const tr = document.createElement("tr");
+        cols.forEach(col => {
+          const td = document.createElement("td");
+          td.textContent = (r[col] === null || r[col] === undefined) ? "" : r[col];
+          tr.appendChild(td);
+        });
         tbody.appendChild(tr);
       });
       table.appendChild(tbody);

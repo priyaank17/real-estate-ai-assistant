@@ -5,68 +5,60 @@ flowchart TD
     UI[Frontend\nindex.html] -->|POST /api/agents/chat\nconversation_id| API
     subgraph Django/Ninja
         API[agents/api.py\nNinja endpoint] -->|thread_id config| Graph
-        API -->|hard guard\n(no tools)| Guard
+        API -->|guard if no tools| Guard
     end
-    subgraph LangGraph Agent
-        Graph[agents/graph.py\nStateGraph + MemorySaver]
-        Intent[extract_intent_filters\n(tools/intent_tool.py)]
-        SQL[execute_sql_query\n(tools/sql_tool.py)]
-        RAG[search_rag\n(tools/rag_tool.py)]
-        UICTX[update_ui_context\n(tools/ui_tool.py)]
-        BOOK[book_viewing\n(tools/booking_tool.py)]
-        INV[analyze_investment]
-        COMP[compare_projects]
-        WEB[web_search]
+
+    subgraph LangGraph Agent (deterministic)
+        Intent(Intent node\nextract_intent_filters\n+ lead capture) -->|booking intent| Book
+        Intent -->|greeting/off-topic| Guard
+        Intent --> SQL(SQL node\nexecute_sql_query)
+
+        SQL -->|detail ask + project/shortlist| Detail
+        SQL -->|investment intent| Invest
+        SQL -->|comparison intent| Compare
+        SQL -->|otherwise| UIshort
+
+        Detail -->|booking intent| Book
+        Detail --> UIshort
+
+        UIshort(UI sync\nupdate_ui_context\nshortlist + preview) --> Respond
+        Invest(analyze_investment) --> Respond
+        Compare(compare_properties) --> Respond
+        Book(book_viewing\nlead upsert) --> END
+        Respond --> END
     end
-    Graph --> Intent
-    Graph --> SQL
-    Graph --> RAG
-    Graph --> UICTX
-    Graph --> BOOK
-    Graph --> INV
-    Graph --> COMP
-    Graph --> WEB
-    SQL --> UICTX
-    RAG --> UICTX
-    UICTX --> API
-    Graph -->|response| API
-    Guard -->|fallback msg| UI
-    API -->|JSON: response,\npreview_markdown,\ncitations,\ntools_used,\nshortlist| UI
 ```
 
-## Flow (per turn)
-1. **Frontend** sends `message` + `conversation_id` (persisted in localStorage).
-2. **API** calls the LangGraph app with `thread_id=conversation_id` (MemorySaver keeps conversation state).
-3. **Agent (graph)** runs with the system prompt. It calls `extract_intent_filters` first to pull project/developer/city/price/bedrooms/property_type/features.
-4. Based on intent, the agent triggers:
-   - `execute_sql_query` for structured search (primary).
-   - `search_rag` for fuzzy/amenity/description or when SQL is empty (and often both).
-   - Other tools as needed: `analyze_investment`, `compare_projects`, `book_viewing`, `web_search` (last resort), and `update_ui_context` to push shortlist IDs to the UI.
-5. Tool messages (with rows/ids/preview/citations) are returned to the agent, which synthesizes the user-facing reply.
-6. **API** extracts `tools_used`, `preview_markdown`, `citations`, and shortlist data for the UI. Hard guard: if no tool fired and it wasn’t a greeting/clarifier, return a safe “missing filters” message.
-7. **Frontend** renders the assistant reply, per-message tools_used, shortlist, optional preview table, and citations toggle.
+## Per-turn flow
+1. **Intent**: extracts project/developer/city/price/beds/type/features, detail-vs-listing flag (LLM+heuristics), greeting/off-topic, investment/comparison, lead name/email. Non-detail queries clear stale detail/selection. Lead is upserted immediately when an email is present.
+2. **Routing after intent**:
+   - Booking intent → **Book** (direct, no LLM).
+   - Greeting/off-topic → **Guard** (polite nudge).
+   - Else → **SQL**.
+3. **SQL node**: Vanna text-to-SQL with like-search for project/dev/features. Builds rows/project_ids/preview, shortlist, and name sample logging.
+4. **Routing after SQL**:
+   - Detail ask + project/shortlist → **Detail**.
+   - Investment intent → **Invest**.
+   - Comparison intent → **Compare**.
+   - Else → **UI** (sync shortlist/preview to frontend).
+5. **Detail node**: best-match row by project name (normalized) from current SQL rows; else direct fetch; skips “project name not available”; if no match, stays listing.
+6. **Investment/Comparison nodes**: call tools with selected/shortlist ids.
+7. **Respond**:
+   - If booking payload exists, returns confirmation directly.
+   - Detail mode: uses only the selected project row (all columns) for amenity/column answers.
+   - Listing: concise top samples; full rows go via `data_sync` for UI “Show all rows”.
+8. **API extraction**: always returns `data` (rows/detail/preview/shortlist) when `data_sync` is sent; preview/citations/tools_used surfaced for UI.
 
-## How tools interact
-- **Intent**: parses filters; no data access.
-- **SQL**: generates/runs SQL via Vanna; returns rows, `project_ids`, and a preview table (only when shortlist exists).
-- **RAG**: semantic search over descriptions/features; returns `results` and `project_ids` (no preview table by design).
-- **UI context**: called when `project_ids` exist to sync shortlist with the frontend.
-- **Booking**: writes leads/visit_bookings when the user confirms a visit.
-- **Investment/Comparison/Web**: specialized branches; web is last resort when local data can’t answer.
+## Tool roles
+- `extract_intent_filters`: filters + intent flags + lead parsing.
+- `execute_sql_query`: Vanna SQL rows + preview + project_ids.
+- `fetch_project_row`: for semntic serach queries RAG alternative no cost involved ,single project with all columns (amenities/description).
+- `update_ui_context`: sync shortlist to UI.
+- `book_viewing`: upserts lead and creates visit_bookings; confirmation returned directly.
+- `analyze_investment`: computes price-per-sqm, yield heuristic, score for 1–3 projects.
+- `compare_properties`: compares selected ids with key metrics + preview table.
 
-## Prompt vs Graph Logic (trade-offs)
-- **System prompt (current approach)**:
-  - Pros: Fast to adjust behavior; co-locates policy and reasoning in one place; fewer code changes.
-  - Cons: Less deterministic; the model might ignore instructions; harder to enforce strict ordering of tool calls.
-- **Graph/state logic (conditional edges, nodes)**:
-  - Pros: Deterministic routing (e.g., always call intent → SQL → fallback RAG); clearer separation of control flow; easier to test.
-  - Cons: More code/config changes; added complexity; risk of rigidity if over-constrained.
-
-Practical guidance:
-- Keep high-level goals and style in the prompt (what to achieve, how to speak).
-- Encode **must-run** behaviors in the graph/tooling layer (e.g., always run intent extraction; if SQL returns 0, run RAG; if project/developer present, run RAG+SQL before asking filters). That ensures compliance even if the model drifts.
-- Use small helper tools (like the intent extractor) to feed structured signals into routing.
-- If you see the model skipping tools despite the prompt, move that rule into the graph as an explicit node/edge decision.
-
-## Why a greeting was blocked
-- The API has a hard guard that only trips when **no tools fired** and the reply isn’t a greeting/clarifier. With a project name present, the prompt now tells the agent to call intent → SQL + RAG immediately; that should populate `tools_used` and bypass the guard. If you still hit the guard, it means the model didn’t call tools—then tighten routing in the graph (e.g., explicit “project name → RAG+SQL” edge).
+## UX notes
+- Booking confirmations bypass the LLM; missing project/email prompts are shown as plain text.
+- Detail questions route to detail node via LLM intent `question_type`/`is_detail` or heuristics.
+- Listing answers stay small; UI renders full tables via `data_sync` with “Show all rows” toggle.
