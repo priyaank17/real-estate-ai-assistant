@@ -1,6 +1,9 @@
 # Silver Land Properties AI Assistant — LangGraph agentic flow
 
-Agentic real-estate concierge built on Django + LangGraph where the LLM dynamically chooses tools (SQL, RAG, web search, booking, investment, comparison). If you prefer a deterministic workflow, use the `feature/langgraph-tools` branch.
+Agentic real-estate concierge built on Django + LangGraph where the LLM dynamically chooses tools (SQL, RAG, web search, booking, investment, comparison). 
+If you prefer a deterministic workflow, use the `feature/langgraph-tools` branch.
+
+![alt text](image.png)
 
 ---
 
