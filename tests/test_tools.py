@@ -2,17 +2,28 @@ import os
 import sys
 import django
 import pandas as pd
+import pytest
 from django.test import TestCase
 from unittest.mock import patch, MagicMock
+
+try:
+    import vanna  # noqa: F401
+    VANNA_AVAILABLE = True
+except ImportError:
+    VANNA_AVAILABLE = False
 
 # Setup Django
 sys.path.append(os.getcwd())
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'silver_land.settings')
 django.setup()
 
+if not VANNA_AVAILABLE:
+    pytest.skip("Vanna not installed; skipping tool tests that depend on it", allow_module_level=True)
+
 from tools.ui_tool import update_ui_context
 from tools.sql_tool import execute_sql_query
 from tools.rag_tool import search_rag
+from tools.intent_tool import extract_intent_filters
 
 class ToolTests(TestCase):
     def setUp(self):
@@ -20,7 +31,7 @@ class ToolTests(TestCase):
 
     def test_ui_tool(self):
         """Test that the UI tool returns the expected string."""
-        result = update_ui_context.invoke({"shortlisted_project_ids": [1, 2, 3]})
+        result = update_ui_context.invoke({"shortlisted_project_ids": ["1", "2", "3"]})
         self.assertEqual(result, "UI Context Updated.")
 
     @patch("tools.sql_tool.get_vanna_client")
@@ -64,4 +75,13 @@ class ToolTests(TestCase):
         self.assertIn("results", result)
         self.assertEqual(result["project_ids"], ["123"])
         self.assertEqual(result["results"][0]["project_id"], "123")
-        self.assertIn("Test Project", result["preview_markdown"])
+        # preview_markdown is suppressed for RAG responses; ensure it's a string
+        self.assertIsInstance(result.get("preview_markdown"), str)
+
+    def test_intent_heuristics_no_llm(self):
+        """Intent extractor should parse filters without needing LLM."""
+        intent = extract_intent_filters.run("Book a visit for 2 bedroom apartments in Dubai under 2M")
+        self.assertEqual(intent.get("city"), "dubai")
+        self.assertEqual(intent.get("bedrooms"), 2)
+        self.assertEqual(intent.get("property_type"), "apartment")
+        self.assertIsNotNone(intent.get("price_max"))

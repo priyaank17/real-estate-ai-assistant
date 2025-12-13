@@ -212,12 +212,20 @@ python scripts/ingest_rag.py   # uses Azure/OpenAI embeddings
 
 ---
 
-## Testing Tips
-- SQL search: `{"message": "Find 2 bedroom apartments in Dubai"}`.
-- Detail: `{"message": "Amenities for The OWO Residences London"}`.
+## Testing
+```bash
+pytest -q
+```
+Ensure `.env` is set and DB is migrated/seeded; some tests patch tools to avoid external calls.
+- API tests cover conversation creation and chat responses (including data_sync parsing and guard behavior).
+- Tool tests cover intent heuristics, SQL, RAG, and UI sync behavior (skipped if Vanna is unavailable).
+
+### Quick test prompts
+- SQL search: `{"message": "Find 2 bedroom apartments in Dubai"}`
+- Detail: `{"message": "Amenities for The OWO Residences London"}`
 - Booking: `{"message": "Book my visit to Downtown Dubai Residences for Priya (priya@example.com)"}`.
-- Investment: `{"message": "Investment analysis for The OWO Residences"}`.
-- Comparison: `{"message": "Compare Burj Binghatti and Safa One"}`.
+- Investment: `{"message": "Investment analysis for The OWO Residences"}`
+- Comparison: `{"message": "Compare Burj Binghatti and Safa One"}`
 
 ---
 
