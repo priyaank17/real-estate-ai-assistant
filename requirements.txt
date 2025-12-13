@@ -13,6 +13,6 @@ chromadb
 fastmcp==0.3.1
 langchain-openai
 langchain-mcp-adapters
-vanna[chromadb,openai]
+vanna[chromadb,openai]<2.0.0
 pandas
 python-dotenv
