@@ -2,21 +2,21 @@
 
 ```mermaid
 flowchart TD
-  UI["Frontend<br/>index.html"] -->|POST /api/agents/chat<br/>conversation_id| API
+  UI[Frontend / index.html] -->|POST /api/agents/chat + conversation_id| API
   subgraph Django_Ninja
-    API["agents/api.py<br/>Ninja endpoint"] -->|thread_id config| Graph
-    API -->|hard guard<br/>(no tools)| Guard
+    API[agents/api.py (Ninja endpoint)] -->|thread_id config| Graph
+    API -->|hard guard (no tools)| Guard
   end
   subgraph LangGraph_Agent
-    Graph["agents/graph.py<br/>StateGraph + MemorySaver"]
-    Intent["extract_intent_filters<br/>(tools/intent_tool.py)"]
-    SQL["execute_sql_query<br/>(tools/sql_tool.py)"]
-    RAG["search_rag<br/>(tools/rag_tool.py)"]
-    UICTX["update_ui_context<br/>(tools/ui_tool.py)"]
-    BOOK["book_viewing<br/>(tools/booking_tool.py)"]
-    INV["analyze_investment"]
-    COMP["compare_projects"]
-    WEB["web_search"]
+    Graph[agents/graph.py StateGraph + MemorySaver]
+    Intent[extract_intent_filters (tools/intent_tool.py)]
+    SQL[execute_sql_query (tools/sql_tool.py)]
+    RAG[search_rag (tools/rag_tool.py)]
+    UICTX[update_ui_context (tools/ui_tool.py)]
+    BOOK[book_viewing (tools/booking_tool.py)]
+    INV[analyze_investment]
+    COMP[compare_projects]
+    WEB[web_search]
   end
   Graph --> Intent
   Graph --> SQL
@@ -31,7 +31,7 @@ flowchart TD
   UICTX --> API
   Graph -->|response| API
   Guard -->|fallback msg| UI
-  API -->|JSON: response,<br/>preview_markdown,<br/>citations,<br/>tools_used,<br/>shortlist| UI
+  API -->|JSON: response, preview_markdown, citations, tools_used, shortlist| UI
 ```
 
 ## Flow (per turn)
