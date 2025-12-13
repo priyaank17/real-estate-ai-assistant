@@ -4,7 +4,7 @@ from langchain_core.tools import tool
 
 from helpers.vectorstore import get_vectorstore
 
-MAX_RESULTS = 5
+MAX_RESULTS = 8
 
 
 @tool
@@ -36,35 +36,29 @@ def search_rag(query: str) -> Dict[str, Any]:
                     "project_id": project_id,
                     "project_name": meta.get("project_name", "Unknown Project"),
                     "city": meta.get("city"),
+                    "country": meta.get("country"),
                     "property_type": meta.get("property_type"),
-                    "snippet": doc.page_content[:400],
+                    "unit_type": meta.get("unit_type"),
+                    "status": meta.get("status"),
+                    "completion_date": meta.get("completion_date"),
+                    "developer": meta.get("developer"),
+                    "bedrooms": meta.get("bedrooms"),
+                    "bathrooms": meta.get("bathrooms"),
+                    "price": meta.get("price"),
+                    "area": meta.get("area"),
+                    "features": meta.get("features"),
+                    "facilities": meta.get("facilities"),
+                    "snippet": doc.page_content or "",
+                    "description_chunk": doc.page_content or "",
                 }
             )
 
         project_ids = [item["project_id"] for item in structured if item["project_id"]]
-        columns = ["project_id", "project_name", "city", "property_type", "snippet"]
-        try:
-            # Avoid heavy dependencies; build markdown manually
-            header_line = "| " + " | ".join(columns) + " |"
-            separator_line = "| " + " | ".join(["---"] * len(columns)) + " |"
-            value_lines = []
-            for item in structured:
-                values = [
-                    item.get("project_id") or "",
-                    item.get("project_name") or "",
-                    item.get("city") or "",
-                    item.get("property_type") or "",
-                    (item.get("snippet") or "")[:200].replace("\n", " "),
-                ]
-                value_lines.append("| " + " | ".join(values) + " |")
-            preview_markdown = "\n".join([header_line, separator_line] + value_lines)
-        except Exception:
-            preview_markdown = ""
-
         return {
             "results": structured,
             "project_ids": project_ids,
-            "preview_markdown": preview_markdown,
+            "preview_markdown": "",  # suppress table for RAG answers
+            "source_tool": "search_rag",
         }
     except Exception as e:
         return {

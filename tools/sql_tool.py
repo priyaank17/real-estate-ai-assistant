@@ -1,4 +1,6 @@
 from typing import Any, Dict
+import io
+import contextlib
 
 from langchain_core.tools import tool
 
@@ -21,7 +23,9 @@ def execute_sql_query(query: str) -> Dict[str, Any]:
     sql = None
     try:
         vn = get_vanna_client()
-        sql = vn.generate_sql(query)
+        # Suppress noisy library prints during generation/execute
+        with contextlib.redirect_stdout(io.StringIO()):
+            sql = vn.generate_sql(query)
 
         if not sql:
             return {
@@ -34,7 +38,8 @@ def execute_sql_query(query: str) -> Dict[str, Any]:
                 "project_ids": [],
             }
 
-        df = vn.run_sql(sql)
+        with contextlib.redirect_stdout(io.StringIO()):
+            df = vn.run_sql(sql)
         if df is None:
             return {"sql": sql, "rows": [], "columns": [], "row_count": 0, "truncated": False, "project_ids": []}
 
@@ -57,21 +62,31 @@ def execute_sql_query(query: str) -> Dict[str, Any]:
         rows = clean_df.to_dict(orient="records")
         project_ids = [row["id"] for row in rows if row.get("id")]
 
-        try:
-            preview_markdown = clean_df.to_markdown(index=False)
-        except Exception:
-            if columns:
-                header_line = "| " + " | ".join(columns) + " |"
-                separator_line = "| " + " | ".join(["---"] * len(columns)) + " |"
-                value_lines = [
-                    "| " + " | ".join(
-                        [str(row.get(col, "")) if row.get(col) is not None else "" for col in columns]
-                    ) + " |"
-                    for row in rows
-                ]
-                preview_markdown = "\n".join([header_line, separator_line] + value_lines)
-            else:
-                preview_markdown = ""
+        # Build a compact preview table only when we have shortlist/project_ids
+        preview_cols = [c for c in ["id", "name", "city", "property_type", "bedrooms", "price", "status"] if c in columns]
+        preview_markdown = ""
+        if preview_cols and project_ids:
+            filtered_df = clean_df[clean_df["id"].isin(project_ids)].copy()
+            if not filtered_df.empty:
+                # Reorder to match project_ids sequence
+                filtered_df["__order"] = filtered_df["id"].apply(lambda x: project_ids.index(x) if x in project_ids else len(project_ids))
+                filtered_df = filtered_df.sort_values("__order")
+                max_preview_rows = len(project_ids)
+                try:
+                    preview_df = filtered_df.head(max_preview_rows)[preview_cols]
+                    preview_markdown = preview_df.to_markdown(index=False)
+                except Exception:
+                    header_line = "| " + " | ".join(preview_cols) + " |"
+                    separator_line = "| " + " | ".join(["---"] * len(preview_cols)) + " |"
+                    value_lines = []
+                    subset_rows = filtered_df.head(max_preview_rows).to_dict(orient="records")
+                    for row in subset_rows:
+                        values = []
+                        for col in preview_cols:
+                            val = row.get(col)
+                            values.append(str(val) if val is not None else "")
+                        value_lines.append("| " + " | ".join(values) + " |")
+                    preview_markdown = "\n".join([header_line, separator_line] + value_lines)
 
         payload: Dict[str, Any] = {
             "sql": sql,
@@ -81,6 +96,7 @@ def execute_sql_query(query: str) -> Dict[str, Any]:
             "truncated": len(df) > len(rows),
             "preview_markdown": preview_markdown,
             "project_ids": project_ids,
+            "source_tool": "execute_sql_query",
         }
 
         return payload

@@ -6,229 +6,152 @@
   <title>Silver Land Concierge</title>
   <style>
     :root {
-      --bg: #0f172a;
-      --panel: #111827;
-      --accent: #06b6d4;
-      --text: #e5e7eb;
-      --muted: #94a3b8;
-      --border: #1f2937;
-      --danger: #ef4444;
-      --success: #10b981;
+      --bg-1: #5b7bfa;
+      --bg-2: #8e61e5;
+      --panel: #ffffff;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --muted: #6b7280;
+      --accent: #6f6af8;
+      --accent-2: #a855f7;
+      --shadow: 0 25px 60px rgba(0, 0, 0, 0.18);
     }
     * { box-sizing: border-box; }
     body {
       margin: 0;
       font-family: "Inter", system-ui, -apple-system, sans-serif;
-      background: linear-gradient(135deg, #0b1224, #0f172a 60%, #0b1224);
-      color: var(--text);
-    }
-    a { color: var(--accent); }
-    .app {
-      display: grid;
-      grid-template-columns: 280px 1fr 320px;
-      gap: 16px;
-      padding: 16px;
+      background: linear-gradient(135deg, var(--bg-1), var(--bg-2));
       min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      padding: 28px 16px 40px;
     }
-    .panel {
-      background: rgba(17, 24, 39, 0.9);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.35);
-      backdrop-filter: blur(6px);
-      overflow: hidden;
-    }
-    .panel-header {
-      padding: 14px 16px;
-      border-bottom: 1px solid var(--border);
-      font-weight: 600;
-      letter-spacing: 0.2px;
-    }
-    .history {
-      padding: 10px;
-      display: grid;
-      gap: 8px;
-      max-height: calc(100vh - 64px);
-      overflow-y: auto;
-    }
-    .history button {
-      text-align: left;
+    .shell {
       width: 100%;
-      background: #0b1020;
+      max-width: 1080px;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px;
+    }
+    .hero-card {
+      background: var(--panel);
+      border-radius: 22px;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+      border: 1px solid var(--border);
+    }
+    .hero-header {
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: white;
+      padding: 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; font-weight: 700; }
+    .brand-icon {
+      width: 42px; height: 42px;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.2);
+      display: grid; place-items: center;
+      font-weight: 800;
+    }
+    .chip { background: rgba(255,255,255,0.16); padding: 8px 12px; border-radius: 12px; font-weight: 700; cursor: pointer; border: 1px solid rgba(255,255,255,0.2); }
+    .chat-area { background: #f8fafc; padding: 16px 18px 6px; }
+    .history { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+    .history button {
+      background: #f8fafc;
       color: var(--text);
       border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 10px;
+      border-radius: 12px;
+      padding: 8px 10px;
       cursor: pointer;
-      transition: border-color 0.15s, transform 0.15s;
+      transition: border-color 0.15s, transform 0.15s, background 0.2s;
     }
     .history button:hover { border-color: var(--accent); transform: translateY(-1px); }
-    .history button.active { border-color: var(--accent); background: #0f172a; }
-
-    .chat {
-      display: grid;
-      grid-template-rows: 1fr auto;
-      height: calc(100vh - 32px);
-    }
+    .history button.active { border-color: var(--accent); background: #eef2ff; }
     .messages {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 16px;
       padding: 16px;
+      min-height: 520px;
+      max-height: 640px;
       overflow-y: auto;
       display: grid;
-      gap: 12px;
+      gap: 14px;
+    }
+    .message-row { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: start; }
+    .avatar {
+      width: 34px; height: 34px; border-radius: 10px;
+      background: #eef2ff; border: 1px solid #e5e7eb;
+      display: grid; place-items: center; font-weight: 700; color: #4338ca; font-size: 12px;
     }
     .bubble {
-      max-width: 720px;
-      padding: 12px 14px;
-      border-radius: 12px;
-      border: 1px solid var(--border);
-      background: #0b1020;
-      line-height: 1.5;
-      white-space: pre-wrap;
+      padding: 12px 14px; border-radius: 14px; border: 1px solid #e5e7eb;
+      background: #fff; line-height: 1.55; white-space: pre-wrap; position: relative;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.05);
     }
-    .bubble.user { margin-left: auto; background: #0f172a; }
-    .meta-grid {
-      display: grid;
-      gap: 10px;
-      padding: 12px;
-    }
-    .pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 6px 10px;
-      border-radius: 999px;
-      background: #0f172a;
-      border: 1px solid var(--border);
-      color: var(--muted);
-      font-size: 12px;
-    }
-    .tool-list { display: flex; flex-wrap: wrap; gap: 6px; }
-    .table-preview {
-      overflow-x: auto;
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 10px;
-      background: #0b1020;
-      font-family: "JetBrains Mono", "SFMono-Regular", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-      font-size: 13px;
-      color: var(--text);
-    }
-    form {
-      display: grid;
-      grid-template-columns: 1fr auto;
-      gap: 12px;
-      padding: 12px 16px 16px;
-      border-top: 1px solid var(--border);
-      background: #0b1020;
-    }
-    textarea {
-      width: 100%;
-      padding: 12px;
-      border-radius: 10px;
-      border: 1px solid var(--border);
-      background: #0f172a;
-      color: var(--text);
-      resize: vertical;
-      min-height: 60px;
-      font-family: inherit;
-    }
-    button.send {
-      background: var(--accent);
-      color: #0b1020;
-      border: none;
-      border-radius: 10px;
-      padding: 14px 16px;
-      font-weight: 700;
-      cursor: pointer;
-      transition: transform 0.15s, box-shadow 0.15s;
-    }
-    button.send:hover { transform: translateY(-1px); box-shadow: 0 10px 25px rgba(6, 182, 212, 0.35); }
-    .right-panel {
-      display: grid;
-      grid-template-rows: auto auto auto 1fr;
-      gap: 10px;
-      height: calc(100vh - 32px);
-    }
-    .section {
-      padding: 12px 14px;
-      border-bottom: 1px solid var(--border);
-      font-weight: 600;
-      color: var(--muted);
-    }
-    .list {
-      padding: 12px;
-      display: grid;
-      gap: 8px;
-      overflow-y: auto;
-    }
-    .id-chip {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 6px 8px;
-      border-radius: 8px;
-      background: #0f172a;
-      border: 1px solid var(--border);
-      font-size: 12px;
-      color: var(--text);
-    }
-    .muted { color: var(--muted); }
-    .citation { font-size: 13px; color: var(--muted); line-height: 1.4; }
-    .citation strong { color: var(--text); }
-    @media (max-width: 1100px) {
-      .app { grid-template-columns: 1fr; }
-      .chat { height: auto; }
-      .right-panel { grid-template-rows: auto auto auto auto; }
-    }
+    .bubble.user { margin-left: auto; background: #eef2ff; border-color: #c7d2fe; }
+    .bubble .label { position: absolute; top: -10px; left: 12px; font-size: 11px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; }
+    .meta-block { margin-top: 10px; display: grid; gap: 8px; }
+    .pill { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 999px; background: #eef2ff; border: 1px solid #e5e7eb; color: #4338ca; font-size: 12px; }
+    .id-chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 8px; border-radius: 8px; background: #f1f5f9; border: 1px solid #e2e8f0; font-size: 12px; color: #0f172a; }
+    .table-wrapper { border: 1px solid #e2e8f0; border-radius: 10px; overflow-x: auto; overflow-y: hidden; background: #fff; width: 100%; }
+    .table-wrapper table { width: 100%; min-width: 520px; border-collapse: collapse; font-size: 13px; }
+    .table-wrapper th, .table-wrapper td { padding: 8px 10px; border-bottom: 1px solid #e2e8f0; text-align: left; white-space: nowrap; }
+    .table-wrapper th { background: #f8fafc; font-weight: 700; color: #0f172a; }
+    .citation { font-size: 13px; color: #475569; line-height: 1.45; }
+    .citation strong { color: #0f172a; }
+    .suggestions { padding: 10px 16px 4px; font-size: 12px; color: #6b7280; }
+    .suggest-chips { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 16px 12px; }
+    .suggest-chips button { border: 1px solid #e2e8f0; background: #fff; color: #4338ca; padding: 8px 12px; border-radius: 12px; cursor: pointer; font-weight: 600; }
+    .input-bar { display: grid; grid-template-columns: 1fr auto; gap: 12px; padding: 12px 16px 16px; background: #f8fafc; border-top: 1px solid #e5e7eb; }
+    textarea { width: 100%; padding: 12px; border-radius: 14px; border: 1px solid #e2e8f0; background: #fff; color: #0f172a; resize: vertical; min-height: 64px; font-family: inherit; }
+    button.send { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; border: none; border-radius: 14px; padding: 14px 18px; font-weight: 800; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s; }
+    button.send:hover { transform: translateY(-1px); box-shadow: 0 10px 25px rgba(111, 106, 248, 0.35); }
   </style>
 </head>
 <body>
-  <div class="app">
-    <div class="panel">
-      <div class="panel-header">Conversation History</div>
-      <div class="history" id="history"></div>
-    </div>
-
-    <div class="panel chat">
-      <div class="messages" id="messages"></div>
-      <form id="chat-form">
-        <textarea id="input" placeholder="Ask about properties, budgets, or book a visit..." required></textarea>
-        <button class="send" type="submit">Send</button>
-      </form>
-    </div>
-
-    <div class="panel right-panel">
-      <div>
-        <div class="section">Tools Used</div>
-        <div class="list" id="tools-list"><span class="muted">No tools yet.</span></div>
+  <div class="shell">
+    <div class="hero-card">
+      <div class="hero-header">
+        <div class="brand">
+          <div class="brand-icon">SL</div>
+          <div>Silver Land Concierge<br><span style="font-size:12px; opacity:0.85;">AI-powered real estate agent</span></div>
+        </div>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <div class="chip" id="reset-btn">Reset storage</div>
+          <div class="chip" id="new-chat-btn">+ New conversation</div>
+        </div>
       </div>
-      <div>
-        <div class="section">Shortlist</div>
-        <div class="list" id="shortlist"></div>
-      </div>
-      <div>
-        <div class="section">Preview Table</div>
-        <div class="list" id="preview"></div>
-      </div>
-      <div>
-        <div class="section">Citations</div>
-        <div class="list" id="citations"></div>
+      <div class="chat-area">
+        <div class="history" id="history"></div>
+        <div class="messages" id="messages"></div>
+        <div class="suggestions">Try these examples:</div>
+        <div class="suggest-chips" id="suggestions"></div>
+        <form id="chat-form" class="input-bar">
+          <textarea id="input" placeholder="Ask about properties, budgets, or book a visit..." required></textarea>
+          <button class="send" type="submit">Send</button>
+        </form>
       </div>
     </div>
   </div>
 
   <script>
-    const API_BASE = window.localStorage.getItem("api_base") || "http://localhost:8000/api/agents/chat";
+    const API_DEFAULT = "http://localhost:8000/api/agents/chat";
+    let API_BASE = window.localStorage.getItem("api_base") || API_DEFAULT;
+    if (!API_BASE.startsWith("http")) { API_BASE = API_DEFAULT; window.localStorage.removeItem("api_base"); }
+
     const historyEl = document.getElementById("history");
     const messagesEl = document.getElementById("messages");
-    const toolsEl = document.getElementById("tools-list");
-    const shortlistEl = document.getElementById("shortlist");
-    const previewEl = document.getElementById("preview");
-    const citationsEl = document.getElementById("citations");
     const form = document.getElementById("chat-form");
     const input = document.getElementById("input");
 
-    let conversationId = window.localStorage.getItem("conversation_id") || crypto.randomUUID();
+    const DEFAULT_WELCOME = "👋 Welcome! I'm your AI real estate assistant.\nI can help you:\n• Find properties by city, budget, and unit size (SQL)\n• Search amenities and descriptions (RAG)\n• Compare investments\n• Book property viewings\nTell me your city, budget, and bedrooms to get started.";
+
+    let conversationId = window.localStorage.getItem("conversation_id") || (crypto.randomUUID ? crypto.randomUUID() : `conv-${Date.now()}`);
     let history = JSON.parse(window.localStorage.getItem("history") || "[]");
 
     function persist() {
@@ -240,7 +163,7 @@
       historyEl.innerHTML = "";
       if (!history.length) {
         const empty = document.createElement("div");
-        empty.style.color = "var(--muted)";
+        empty.style.color = "#94a3b8";
         empty.style.padding = "6px";
         empty.textContent = "No conversations yet.";
         historyEl.appendChild(empty);
@@ -262,76 +185,97 @@
     function renderMessages(msgs = []) {
       messagesEl.innerHTML = "";
       msgs.forEach(m => {
-        const div = document.createElement("div");
-        div.className = "bubble " + (m.role === "user" ? "user" : "assistant");
-        div.textContent = m.content;
-        messagesEl.appendChild(div);
+        const row = document.createElement("div");
+        row.className = "message-row";
+        const avatar = document.createElement("div");
+        avatar.className = "avatar";
+        avatar.textContent = m.role === "user" ? "You" : "SL";
+        const bubble = document.createElement("div");
+        bubble.className = "bubble " + (m.role === "user" ? "user" : "assistant");
+        const label = document.createElement("div");
+        label.className = "label";
+        label.textContent = m.role === "user" ? "You" : "Assistant";
+        const content = document.createElement("div");
+        content.textContent = m.content;
+        bubble.appendChild(label);
+        bubble.appendChild(content);
+        if (m.meta && (m.meta.tools?.length || m.meta.shortlist?.length || m.meta.preview || m.meta.citations?.length)) {
+          const metaBox = document.createElement("div");
+          metaBox.className = "meta-block";
+          if (m.meta.tools?.length) {
+            const toolsRow = document.createElement("div");
+            toolsRow.innerHTML = `<span class="pill">Tools</span> ${m.meta.tools.map(t => `<span class="pill">${t}</span>`).join(" ")}`;
+            metaBox.appendChild(toolsRow);
+          }
+          if (m.meta.shortlist?.length) {
+            const slRow = document.createElement("div");
+            slRow.innerHTML = `<span class="pill">Shortlist</span> ${m.meta.shortlist.map(id => `<span class="id-chip">${id}</span>`).join(" ")}`;
+            metaBox.appendChild(slRow);
+          }
+          if (m.meta.preview) {
+            const tbl = renderMarkdownTable(m.meta.preview);
+            metaBox.appendChild(tbl);
+          }
+          if (m.meta.citations?.length) {
+            const toggle = document.createElement("button");
+            toggle.className = "pill";
+            toggle.textContent = "Show citations";
+            const citWrap = document.createElement("div");
+            citWrap.style.display = "none";
+            citWrap.className = "citation";
+            citWrap.innerHTML = m.meta.citations
+              .map(c => {
+                const pid = c.project_id || "unknown-id";
+                const name = (c.project_name && c.project_name !== "nan") ? c.project_name : "Unknown Project";
+                return `<strong>${name}</strong> (${pid})`;
+              })
+              .join("<br>");
+            toggle.onclick = () => {
+              const open = citWrap.style.display === "block";
+              citWrap.style.display = open ? "none" : "block";
+              toggle.textContent = open ? "Show citations" : "Hide citations";
+            };
+            metaBox.appendChild(toggle);
+            metaBox.appendChild(citWrap);
+          }
+          bubble.appendChild(metaBox);
+        }
+        row.appendChild(avatar);
+        row.appendChild(bubble);
+        messagesEl.appendChild(row);
       });
       messagesEl.scrollTop = messagesEl.scrollHeight;
     }
 
-    function renderTools(tools = []) {
-      toolsEl.innerHTML = "";
-      if (!tools || !tools.length) {
-        toolsEl.innerHTML = '<span style="color: var(--muted);">No tools yet.</span>';
-        return;
+    function getOrCreateSession(title) {
+      let session = history.find(h => h.id === conversationId);
+      if (!session) {
+        session = { id: conversationId, title: title || "New chat", messages: [] };
+        history.unshift(session);
       }
-      const wrap = document.createElement("div");
-      wrap.className = "tool-list";
-      tools.forEach(t => {
-        const pill = document.createElement("span");
-        pill.className = "pill";
-        pill.textContent = t;
-        wrap.appendChild(pill);
-      });
-      toolsEl.appendChild(wrap);
+      return session;
     }
 
-    function renderShortlist(ids = []) {
-      shortlistEl.innerHTML = "";
-      if (!ids || !ids.length) {
-        shortlistEl.innerHTML = '<span class="muted">No shortlisted IDs yet.</span>';
-        return;
-      }
-      ids.forEach(id => {
-        const chip = document.createElement("span");
-        chip.className = "id-chip";
-        chip.textContent = id;
-        shortlistEl.appendChild(chip);
-      });
+    function startNewConversation() {
+      conversationId = crypto.randomUUID ? crypto.randomUUID() : `conv-${Date.now()}`;
+      const session = { id: conversationId, title: "New chat", messages: [{ role: "assistant", content: DEFAULT_WELCOME }] };
+      history.unshift(session);
+      renderHistory();
+      renderMessages(session.messages);
+      persist();
     }
 
-    function renderPreview(markdown) {
-      previewEl.innerHTML = "";
-      if (!markdown) {
-        previewEl.innerHTML = '<span class="muted">No table preview.</span>';
-        return;
-      }
-      const pre = document.createElement("pre");
-      pre.className = "table-preview";
-      pre.textContent = markdown;
-      previewEl.appendChild(pre);
-    }
-
-    function renderCitations(list = []) {
-      citationsEl.innerHTML = "";
-      if (!list || !list.length) {
-        citationsEl.innerHTML = '<span class="muted">No citations.</span>';
-        return;
-      }
-      list.forEach(item => {
-        const div = document.createElement("div");
-        div.className = "citation";
-        const name = item.project_name || "Unknown Project";
-        const city = item.city ? ` • ${item.city}` : "";
-        div.innerHTML = `<strong>${name}</strong>${city}<br>${(item.snippet || "").slice(0, 220)}${(item.snippet || "").length > 220 ? "…" : ""}`;
-        citationsEl.appendChild(div);
-      });
+    function resetStorage() {
+      window.localStorage.clear();
+      history = [];
+      conversationId = crypto.randomUUID ? crypto.randomUUID() : `conv-${Date.now()}`;
+      renderHistory();
+      renderMessages([]);
+      startNewConversation();
     }
 
     async function sendMessage(text) {
-      const session = history.find(h => h.id === conversationId) || { id: conversationId, title: text.slice(0, 32) + "...", messages: [] };
-      if (!history.includes(session)) history.unshift(session);
+      const session = getOrCreateSession(text.slice(0, 32) + "...");
       session.messages.push({ role: "user", content: text });
       renderMessages(session.messages);
       persist();
@@ -342,19 +286,28 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ message: text, conversation_id: conversationId })
         });
+        if (!res.ok) {
+          const body = await res.text();
+          throw new Error(`API ${res.status}: ${body.slice(0, 200)}`);
+        }
         const data = await res.json();
         const assistantMsg = data.response || "[no response]";
-        session.messages.push({ role: "assistant", content: assistantMsg });
+        session.messages.push({
+          role: "assistant",
+          content: assistantMsg,
+          meta: {
+            tools: data.tools_used || [],
+            shortlist: (data.data && data.data.shortlisted_project_ids) || [],
+            preview: data.preview_markdown || null,
+            citations: data.citations || []
+          }
+        });
         renderMessages(session.messages);
-        renderTools(data.tools_used || []);
-        renderShortlist((data.data && data.data.shortlisted_project_ids) || []);
-        renderPreview(data.preview_markdown);
-        renderCitations(data.citations);
         persist();
       } catch (err) {
-        const session = history.find(h => h.id === conversationId);
-        session.messages.push({ role: "assistant", content: "Error: " + err.message });
-        renderMessages(session.messages);
+        const s = history.find(h => h.id === conversationId) || getOrCreateSession("error");
+        s.messages.push({ role: "assistant", content: "Error: " + err.message + ` (API: ${API_BASE}). Clear api_base in localStorage if needed.` });
+        renderMessages(s.messages);
       }
     }
 
@@ -366,12 +319,81 @@
       sendMessage(text);
     });
 
+    document.getElementById("new-chat-btn").onclick = startNewConversation;
+    document.getElementById("reset-btn").onclick = resetStorage;
+
     renderHistory();
     if (history.length) {
       const current = history.find(h => h.id === conversationId) || history[0];
       conversationId = current.id;
       renderHistory();
       renderMessages(current.messages);
+    } else {
+      startNewConversation();
+    }
+
+    // Suggestions
+    const suggestionList = [
+      "Find apartments in Dubai under 2M",
+      "Luxury properties with sea view",
+      "Investment analysis for Miami",
+      "Compare 2 vs 3 bedroom units",
+      "Cheapest options in London"
+    ];
+    const suggestEl = document.getElementById("suggestions");
+    suggestionList.forEach(text => {
+      const btn = document.createElement("button");
+      btn.textContent = text;
+      btn.onclick = () => sendMessage(text);
+      suggestEl.appendChild(btn);
+    });
+
+    function renderMarkdownTable(markdown) {
+      const lines = markdown.trim().split("\n").filter(Boolean);
+      if (lines.length < 2 || !lines[0].includes("|") || !lines[1].includes("---")) {
+        const pre = document.createElement("pre");
+        pre.className = "table-preview";
+        pre.textContent = markdown;
+        return pre;
+      }
+      const headers = lines[0].split("|").map(s => s.trim()).filter(Boolean);
+      const rows = lines.slice(2).map(line => line.split("|").map(s => s.trim()).filter(Boolean));
+      const wrapper = document.createElement("div");
+      wrapper.className = "table-wrapper";
+      const table = document.createElement("table");
+      const thead = document.createElement("thead");
+      const thr = document.createElement("tr");
+      headers.forEach(h => { const th = document.createElement("th"); th.textContent = h; thr.appendChild(th); });
+      thead.appendChild(thr);
+      table.appendChild(thead);
+      const tbody = document.createElement("tbody");
+      rows.forEach(r => {
+        const tr = document.createElement("tr");
+        r.forEach(cell => { const td = document.createElement("td"); td.textContent = cell; tr.appendChild(td); });
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+      wrapper.appendChild(table);
+      return wrapper;
+    }
+
+    // Simple client-side streaming (typewriter) for the latest assistant message
+    function streamAssistantMessage(session, fullText) {
+      const targetMsg = session.messages[session.messages.length - 1];
+      let idx = 0;
+      const speed = 15; // ms per character
+      const step = () => {
+        idx += 3; // stream a few chars at a time
+        targetMsg.content = fullText.slice(0, idx);
+        renderMessages(session.messages);
+        if (idx < fullText.length) {
+          requestAnimationFrame(step);
+        } else {
+          targetMsg.content = fullText; // ensure complete
+          renderMessages(session.messages);
+        }
+      };
+      requestAnimationFrame(step);
     }
   </script>
 </body>

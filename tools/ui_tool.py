@@ -2,7 +2,7 @@ from langchain_core.tools import tool
 from typing import List, Optional, Dict
 
 @tool
-def update_ui_context(shortlisted_project_ids: Optional[List[int]] = None, booking_status: Optional[str] = None):
+def update_ui_context(shortlisted_project_ids: Optional[List[str]] = None, booking_status: Optional[str] = None):
     """
     Update the user interface with structured data.
     Call this tool when you have found specific projects to show to the user, 
