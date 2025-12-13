@@ -89,13 +89,13 @@ flowchart TD
 
   subgraph LangGraph_agentic
     direction TB
-    Agent(Human/LLM core\\nchooses tools) --> SQL[execute_sql_query\\n(Vanna)]
-    Agent --> RAG[search_rag\\n(Chroma/embeddings)]
-    Agent --> WEB[web_search]
-    Agent --> BOOK[book_viewing]
-    Agent --> INVEST[analyze_investment]
-    Agent --> COMPARE[compare_projects]
-    Agent --> UICTX[update_ui_context]
+    Agent["Human/LLM core<br/>chooses tools"] --> SQL["execute_sql_query<br/>(Vanna)"]
+    Agent --> RAG["search_rag<br/>(Chroma/embeddings)"]
+    Agent --> WEB["web_search"]
+    Agent --> BOOK["book_viewing"]
+    Agent --> INVEST["analyze_investment"]
+    Agent --> COMPARE["compare_projects"]
+    Agent --> UICTX["update_ui_context"]
     SQL --> Agent
     RAG --> Agent
     WEB --> Agent
