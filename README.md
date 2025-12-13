@@ -84,17 +84,17 @@ real-estate-ai-assistant/
 
 ```mermaid
 flowchart TD
-  UI[frontend/index.html\nstatic chat] -->|/api/agents/chat| API
-  API[agents/api.py\nNinja endpoint] --> Graph
+  UI[frontend/index.html\\nstatic chat] -->|/api/agents/chat| API
+  API[agents/api.py\\nNinja endpoint] --> Agent
 
-  subgraph LangGraph (agent decides tools)
-    Start(Human message) --> Agent
-    Agent -->|may call| SQL[execute_sql_query\n(Vanna)]
-    Agent -->|may call| RAG[search_rag\n(Chroma/embeddings)]
-    Agent -->|may call| WEB[web_search]
-    Agent -->|may call| BOOK[book_viewing]
-    Agent -->|may call| INVEST[analyze_investment]
-    Agent -->|may call| COMPARE[compare_projects]
+  subgraph LangGraph_agentic
+    direction TB
+    Agent(Human/LLM core\\nchooses tools) --> SQL[execute_sql_query\\n(Vanna)]
+    Agent --> RAG[search_rag\\n(Chroma/embeddings)]
+    Agent --> WEB[web_search]
+    Agent --> BOOK[book_viewing]
+    Agent --> INVEST[analyze_investment]
+    Agent --> COMPARE[compare_projects]
     Agent --> UICTX[update_ui_context]
     SQL --> Agent
     RAG --> Agent
@@ -103,7 +103,6 @@ flowchart TD
     INVEST --> Agent
     COMPARE --> Agent
     UICTX --> Agent
-    Agent --> END
   end
 ```
 
