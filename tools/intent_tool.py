@@ -93,6 +93,12 @@ def _extract_price(text: str) -> Dict[str, Any]:
 
 
 def _extract_bedrooms(text: str) -> Optional[int]:
+    slash = re.search(r"(\d+)\s*/\s*(\d+)", text.lower())
+    if slash:
+        try:
+            return int(slash.group(1))
+        except Exception:
+            pass
     m = re.search(r"(\d+)\s*(bedroom|bed|br|bhk)", text.lower())
     if not m:
         return None
