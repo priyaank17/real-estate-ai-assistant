@@ -2,36 +2,36 @@
 
 ```mermaid
 flowchart TD
-    UI[Frontend\nindex.html] -->|POST /api/agents/chat\nconversation_id| API
-    subgraph Django/Ninja
-        API[agents/api.py\nNinja endpoint] -->|thread_id config| Graph
-        API -->|hard guard\n(no tools)| Guard
-    end
-    subgraph LangGraph Agent
-        Graph[agents/graph.py\nStateGraph + MemorySaver]
-        Intent[extract_intent_filters\n(tools/intent_tool.py)]
-        SQL[execute_sql_query\n(tools/sql_tool.py)]
-        RAG[search_rag\n(tools/rag_tool.py)]
-        UICTX[update_ui_context\n(tools/ui_tool.py)]
-        BOOK[book_viewing\n(tools/booking_tool.py)]
-        INV[analyze_investment]
-        COMP[compare_projects]
-        WEB[web_search]
-    end
-    Graph --> Intent
-    Graph --> SQL
-    Graph --> RAG
-    Graph --> UICTX
-    Graph --> BOOK
-    Graph --> INV
-    Graph --> COMP
-    Graph --> WEB
-    SQL --> UICTX
-    RAG --> UICTX
-    UICTX --> API
-    Graph -->|response| API
-    Guard -->|fallback msg| UI
-    API -->|JSON: response,\npreview_markdown,\ncitations,\ntools_used,\nshortlist| UI
+  UI["Frontend<br/>index.html"] -->|POST /api/agents/chat<br/>conversation_id| API
+  subgraph Django_Ninja
+    API["agents/api.py<br/>Ninja endpoint"] -->|thread_id config| Graph
+    API -->|hard guard<br/>(no tools)| Guard
+  end
+  subgraph LangGraph_Agent
+    Graph["agents/graph.py<br/>StateGraph + MemorySaver"]
+    Intent["extract_intent_filters<br/>(tools/intent_tool.py)"]
+    SQL["execute_sql_query<br/>(tools/sql_tool.py)"]
+    RAG["search_rag<br/>(tools/rag_tool.py)"]
+    UICTX["update_ui_context<br/>(tools/ui_tool.py)"]
+    BOOK["book_viewing<br/>(tools/booking_tool.py)"]
+    INV["analyze_investment"]
+    COMP["compare_projects"]
+    WEB["web_search"]
+  end
+  Graph --> Intent
+  Graph --> SQL
+  Graph --> RAG
+  Graph --> UICTX
+  Graph --> BOOK
+  Graph --> INV
+  Graph --> COMP
+  Graph --> WEB
+  SQL --> UICTX
+  RAG --> UICTX
+  UICTX --> API
+  Graph -->|response| API
+  Guard -->|fallback msg| UI
+  API -->|JSON: response,<br/>preview_markdown,<br/>citations,<br/>tools_used,<br/>shortlist| UI
 ```
 
 ## Flow (per turn)
