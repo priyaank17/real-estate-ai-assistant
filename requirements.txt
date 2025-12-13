@@ -1,18 +1,13 @@
 # Production Dependencies
-django>=6.0
-django-ninja
-langgraph
-Django==6.0
-ninja==1.3.0
+django==4.2.7
+django-ninja==1.1.0
+langgraph>=0.5.0
 langchain==0.3.13
 langchain-community==0.3.13
-langchain-core==0.3.28
-langgraph==0.2.59
-langchain-chroma==0.2.0
+langchain-openai==0.2.0
+langchain-mcp-adapters
 chromadb
 fastmcp==0.3.1
-langchain-openai
-langchain-mcp-adapters
 vanna[chromadb,openai]<2.0.0
 pandas
 python-dotenv
